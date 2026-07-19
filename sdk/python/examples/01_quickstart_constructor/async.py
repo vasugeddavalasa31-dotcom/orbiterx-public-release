@@ -15,14 +15,14 @@ ensure_local_sdk_src()
 
 import asyncio
 
-from openai_codex import AsyncCodex
+from orbiterx import AsyncOrbiterX
 
 
 async def main() -> None:
-    async with AsyncCodex(config=runtime_config()) as codex:
-        print("Server:", server_label(codex.metadata))
+    async with AsyncOrbiterX(config=runtime_config()) as orbiterx:
+        print("Server:", server_label(orbiterx.metadata))
 
-        thread = await codex.thread_start(
+        thread = await orbiterx.thread_start(
             model="gpt-5.4", config={"model_reasoning_effort": "high"}
         )
         result = await thread.run("Say hello in one sentence.")

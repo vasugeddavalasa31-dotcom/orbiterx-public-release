@@ -1,10 +1,10 @@
 # Paths are matched exactly, relative to the repository root.
 # Keep this list short and limited to intentional large checked-in assets.
 
-.github/codex-cli-splash.png
+.github/orbiterx-cli-splash.png
 MODULE.bazel.lock
-codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.schemas.json
-codex-rs/app-server-protocol/schema/json/codex_app_server_protocol.v2.schemas.json
-codex-rs/tui/tests/fixtures/oss-story.jsonl
-codex-rs/tui_app_server/tests/fixtures/oss-story.jsonl
-codex-rs/tui/src/app.rs
+orbiterx-rs/app-server-protocol/schema/json/orbiterx_app_server_protocol.schemas.json
+orbiterx-rs/app-server-protocol/schema/json/orbiterx_app_server_protocol.v2.schemas.json
+orbiterx-rs/tui/tests/fixtures/oss-story.jsonl
+orbiterx-rs/tui_app_server/tests/fixtures/oss-story.jsonl
+orbiterx-rs/tui/src/app.rs

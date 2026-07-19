@@ -1,0 +1,7 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "shell-command",
+    compile_data = ["src/command_safety/powershell_parser.ps1"],
+    crate_name = "orbiterx_shell_command",
+)

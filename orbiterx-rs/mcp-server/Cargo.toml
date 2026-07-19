@@ -1,0 +1,55 @@
+[package]
+name = "orbiterx-mcp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "orbiterx-mcp-server"
+path = "src/main.rs"
+
+[lib]
+name = "orbiterx_mcp_server"
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+orbiterx-arg0 = { workspace = true }
+orbiterx-config = { workspace = true }
+orbiterx-core = { workspace = true }
+orbiterx-home = { workspace = true }
+orbiterx-image-generation-extension = { workspace = true }
+orbiterx-exec-server = { workspace = true }
+orbiterx-extension-api = { workspace = true }
+orbiterx-login = { workspace = true }
+orbiterx-protocol = { workspace = true }
+orbiterx-utils-cli = { workspace = true }
+orbiterx-utils-json-to-toml = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+shlex = { workspace = true }
+tokio = { workspace = true, features = [
+    "io-std",
+    "macros",
+    "process",
+    "rt-multi-thread",
+    "signal",
+] }
+tracing = { workspace = true, features = ["log"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+
+[dev-dependencies]
+orbiterx-utils-absolute-path = { workspace = true }
+orbiterx-shell-command = { workspace = true }
+core_test_support = { workspace = true }
+mcp_test_support = { workspace = true }
+os_info = { workspace = true }
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+wiremock = { workspace = true }

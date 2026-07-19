@@ -1,0 +1,17 @@
+[package]
+name = "orbiterx-utils-oss"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-core = { workspace = true }
+orbiterx-lmstudio = { workspace = true }
+orbiterx-model-provider-info = { workspace = true }
+orbiterx-ollama = { workspace = true }
+
+[lib]
+doctest = false

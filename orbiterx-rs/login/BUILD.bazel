@@ -1,0 +1,11 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "login",
+    compile_data = [
+        "src/assets/error.html",
+        "src/assets/success.html",
+        "src/assets/success_legacy.html",
+    ],
+    crate_name = "orbiterx_login",
+)

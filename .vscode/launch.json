@@ -6,15 +6,15 @@
       "request": "launch",
       "name": "Cargo launch",
       "cargo": {
-        "cwd": "${workspaceFolder}/codex-rs",
-        "args": ["build", "--bin=codex-tui"]
+        "cwd": "${workspaceFolder}/orbiterx-rs",
+        "args": ["build", "--bin=orbiterx-tui"]
       },
       "args": []
     },
     {
       "type": "lldb",
       "request": "attach",
-      "name": "Attach to running codex CLI",
+      "name": "Attach to running orbiterx CLI",
       "pid": "${command:pickProcess}",
       "sourceLanguages": ["rust"]
     }

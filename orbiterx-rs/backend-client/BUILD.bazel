@@ -1,0 +1,7 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "backend-client",
+    compile_data = glob(["tests/fixtures/**"]),
+    crate_name = "orbiterx_backend_client",
+)

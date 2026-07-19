@@ -1,0 +1,9 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "web-search",
+    compile_data = [
+        "web_run_description.md",
+    ],
+    crate_name = "orbiterx_web_search_extension",
+)

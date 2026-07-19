@@ -3,15 +3,15 @@
 version: 2
 updates:
   - package-ecosystem: bun
-    directory: .github/actions/codex
+    directory: .github/actions/orbiterx
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
   - package-ecosystem: cargo
     directories:
-      - codex-rs
-      - codex-rs/*
+      - orbiterx-rs
+      - orbiterx-rs/*
     schedule:
       interval: weekly
     cooldown:
@@ -23,7 +23,7 @@ updates:
     cooldown:
       default-days: 7
   - package-ecosystem: docker
-    directory: codex-cli
+    directory: orbiterx-cli
     schedule:
       interval: weekly
     cooldown:
@@ -35,7 +35,7 @@ updates:
     cooldown:
       default-days: 7
   - package-ecosystem: rust-toolchain
-    directory: codex-rs
+    directory: orbiterx-rs
     schedule:
       interval: weekly
     cooldown:

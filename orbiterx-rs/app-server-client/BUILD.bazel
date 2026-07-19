@@ -1,0 +1,6 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "app-server-client",
+    crate_name = "orbiterx_app_server_client",
+)

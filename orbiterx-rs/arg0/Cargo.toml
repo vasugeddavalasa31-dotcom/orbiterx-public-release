@@ -1,0 +1,33 @@
+[package]
+name = "orbiterx-arg0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "orbiterx_arg0"
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+orbiterx-apply-patch = { workspace = true }
+orbiterx-exec-server = { workspace = true }
+orbiterx-install-context = { workspace = true }
+orbiterx-linux-sandbox = { workspace = true }
+orbiterx-sandboxing = { workspace = true }
+orbiterx-shell-escalation = { workspace = true }
+orbiterx-utils-absolute-path = { workspace = true }
+orbiterx-utils-home-dir = { workspace = true }
+dotenvy = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+
+[target.'cfg(windows)'.dependencies]
+orbiterx-windows-sandbox = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

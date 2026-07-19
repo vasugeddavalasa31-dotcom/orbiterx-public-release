@@ -1,0 +1,24 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-plugin"
+version.workspace = true
+
+[lib]
+doctest = false
+name = "orbiterx_plugin"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-config = { workspace = true }
+orbiterx-protocol = { workspace = true }
+orbiterx-utils-absolute-path = { workspace = true }
+orbiterx-utils-path-uri = { workspace = true }
+orbiterx-utils-plugins = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

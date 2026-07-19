@@ -1,0 +1,7 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "common",
+    crate_name = "app_test_support",
+    crate_srcs = glob(["*.rs"]),
+)

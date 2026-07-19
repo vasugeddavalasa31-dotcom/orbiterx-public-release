@@ -1,0 +1,28 @@
+[package]
+name = "orbiterx-backend-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+orbiterx-backend-openapi-models = { path = "../orbiterx-backend-openapi-models" }
+orbiterx-api = { workspace = true }
+orbiterx-http-client = { workspace = true }
+orbiterx-login = { workspace = true }
+orbiterx-model-provider = { workspace = true }
+orbiterx-protocol = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = "1"

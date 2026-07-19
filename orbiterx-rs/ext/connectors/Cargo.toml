@@ -1,0 +1,23 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-connectors-extension"
+version.workspace = true
+
+[lib]
+name = "orbiterx_connectors_extension"
+path = "src/lib.rs"
+doctest = false
+test = false
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-connectors = { workspace = true }
+orbiterx-core-plugins = { workspace = true }
+orbiterx-plugin = { workspace = true }
+orbiterx-utils-path-uri = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,35 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-model-provider"
+version.workspace = true
+
+[lib]
+doctest = false
+name = "orbiterx_model_provider"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-api = { workspace = true }
+orbiterx-agent-identity = { workspace = true }
+orbiterx-aws-auth = { workspace = true }
+orbiterx-http-client = { workspace = true }
+orbiterx-feedback = { workspace = true }
+orbiterx-login = { workspace = true }
+orbiterx-model-provider-info = { workspace = true }
+orbiterx-models-manager = { workspace = true }
+orbiterx-otel = { workspace = true }
+orbiterx-protocol = { workspace = true }
+orbiterx-response-debug-context = { workspace = true }
+http = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+tracing = { workspace = true, features = ["log"] }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+wiremock = { workspace = true }

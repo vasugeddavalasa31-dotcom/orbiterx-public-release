@@ -1,0 +1,19 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-guardian"
+version.workspace = true
+
+[lib]
+name = "orbiterx_guardian"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-core = { workspace = true }
+orbiterx-extension-api = { workspace = true }
+orbiterx-protocol = { workspace = true }

@@ -1,10 +1,10 @@
-module(name = "codex")
+module(name = "orbiterx")
 
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "llvm", version = "0.7.9")
 
-# Patch hermetic LLVM for Codex's custom libc++ and Windows gnullvm runtime
+# Patch hermetic LLVM for OrbiterX's custom libc++ and Windows gnullvm runtime
 # needs that have not landed upstream.
 single_version_override(
     module_name = "llvm",
@@ -180,8 +180,8 @@ register_toolchains("@rust_toolchains//:all")
 
 crate = use_extension("@rules_rs//rs:extensions.bzl", "crate")
 crate.from_cargo(
-    cargo_lock = "//codex-rs:Cargo.lock",
-    cargo_toml = "//codex-rs:Cargo.toml",
+    cargo_lock = "//orbiterx-rs:Cargo.lock",
+    cargo_toml = "//orbiterx-rs:Cargo.toml",
     platform_triples = [
         "aarch64-unknown-linux-gnu",
         "aarch64-unknown-linux-musl",

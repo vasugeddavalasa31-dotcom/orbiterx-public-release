@@ -11,14 +11,14 @@ ensure_local_sdk_src()
 
 import asyncio
 
-from openai_codex import AsyncCodex, ImageInput, TextInput
+from orbiterx import AsyncOrbiterX, ImageInput, TextInput
 
 IMAGE_DATA_URL = generated_sample_image_data_url()
 
 
 async def main() -> None:
-    async with AsyncCodex(config=runtime_config()) as codex:
-        thread = await codex.thread_start(
+    async with AsyncOrbiterX(config=runtime_config()) as orbiterx:
+        thread = await orbiterx.thread_start(
             model="gpt-5.4", config={"model_reasoning_effort": "high"}
         )
         turn = await thread.turn(

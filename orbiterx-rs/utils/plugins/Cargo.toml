@@ -1,0 +1,26 @@
+
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-utils-plugins"
+version.workspace = true
+
+[lib]
+doctest = false
+name = "orbiterx_utils_plugins"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-exec-server = { workspace = true }
+orbiterx-exec-server-protocol = { workspace = true }
+orbiterx-utils-absolute-path = { workspace = true }
+orbiterx-utils-path-uri = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }

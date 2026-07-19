@@ -1,17 +1,17 @@
 # Core crate ownership.
-/codex-rs/arg0/ @openai/codex-core-agent-team
-/codex-rs/codex-mcp/ @openai/codex-core-agent-team
-/codex-rs/core/ @openai/codex-core-agent-team
-/codex-rs/exec-server/ @openai/codex-core-agent-team
-/codex-rs/exec-server-protocol/ @openai/codex-core-agent-team
-/codex-rs/ext/extension-api/ @openai/codex-core-agent-team
-/codex-rs/prompts/ @openai/codex-core-agent-team
-/codex-rs/utils/path-uri/ @openai/codex-core-agent-team
+/orbiterx-rs/arg0/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/orbiterx-mcp/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/core/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/exec-server/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/exec-server-protocol/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/ext/extension-api/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/prompts/ @openai/orbiterx-core-agent-team
+/orbiterx-rs/utils/path-uri/ @openai/orbiterx-core-agent-team
 
-# Keep macOS AKV signing changes reviewed by Codex maintainers.
-/.github/actions/setup-akv-pkcs11-codesigning/ @openai/codex-core-agent-team
-/.github/scripts/macos-signing/ @openai/codex-core-agent-team
-/.github/workflows/rust-release.yml @openai/codex-core-agent-team
+# Keep macOS AKV signing changes reviewed by OrbiterX maintainers.
+/.github/actions/setup-akv-pkcs11-codesigning/ @openai/orbiterx-core-agent-team
+/.github/scripts/macos-signing/ @openai/orbiterx-core-agent-team
+/.github/workflows/rust-release.yml @openai/orbiterx-core-agent-team
 
 # Keep ownership changes reviewed by the same team.
-/.github/CODEOWNERS @openai/codex-core-agent-team
+/.github/CODEOWNERS @openai/orbiterx-core-agent-team

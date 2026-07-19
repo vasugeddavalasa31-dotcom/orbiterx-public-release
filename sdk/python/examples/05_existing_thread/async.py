@@ -11,12 +11,12 @@ ensure_local_sdk_src()
 
 import asyncio
 
-from openai_codex import AsyncCodex
+from orbiterx import AsyncOrbiterX
 
 
 async def main() -> None:
-    async with AsyncCodex(config=runtime_config()) as codex:
-        original = await codex.thread_start(
+    async with AsyncOrbiterX(config=runtime_config()) as orbiterx:
+        original = await orbiterx.thread_start(
             model="gpt-5.4", config={"model_reasoning_effort": "high"}
         )
 
@@ -24,7 +24,7 @@ async def main() -> None:
         _ = await first_turn.run()
         print("Created thread:", original.id)
 
-        resumed = await codex.thread_resume(original.id)
+        resumed = await orbiterx.thread_resume(original.id)
         second_turn = await resumed.turn("Continue with one more fact.")
         second = await second_turn.run()
         print(second.final_response)

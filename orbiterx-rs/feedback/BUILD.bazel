@@ -1,0 +1,6 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "feedback",
+    crate_name = "orbiterx_feedback",
+)

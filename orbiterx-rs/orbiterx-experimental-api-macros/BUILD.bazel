@@ -1,0 +1,7 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "orbiterx-experimental-api-macros",
+    crate_name = "orbiterx_experimental_api_macros",
+    proc_macro = True,
+)

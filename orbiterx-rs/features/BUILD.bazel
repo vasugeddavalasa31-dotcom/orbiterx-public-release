@@ -1,0 +1,14 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "features",
+    compile_data = glob(
+        include = ["**"],
+        allow_empty = True,
+        exclude = [
+            "BUILD.bazel",
+            "Cargo.toml",
+        ],
+    ),
+    crate_name = "orbiterx_features",
+)

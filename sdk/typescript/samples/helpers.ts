@@ -1,8 +1,8 @@
 import path from "node:path";
 
-export function codexPathOverride() {
+export function orbiterxPathOverride() {
   return (
-    process.env.CODEX_EXECUTABLE ??
-    path.join(process.cwd(), "..", "..", "codex-rs", "target", "debug", "codex")
+    process.env.ORBITERX_EXECUTABLE ??
+    path.join(process.cwd(), "..", "..", "orbiterx-rs", "target", "debug", "orbiterx")
   );
 }

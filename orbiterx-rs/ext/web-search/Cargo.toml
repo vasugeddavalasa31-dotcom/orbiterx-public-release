@@ -1,0 +1,32 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "orbiterx-web-search-extension"
+version.workspace = true
+
+[lib]
+name = "orbiterx_web_search_extension"
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+orbiterx-api = { workspace = true }
+orbiterx-core = { workspace = true }
+orbiterx-extension-api = { workspace = true }
+orbiterx-extension-items = { workspace = true }
+orbiterx-login = { workspace = true }
+orbiterx-model-provider = { workspace = true }
+orbiterx-model-provider-info = { workspace = true }
+orbiterx-otel = { workspace = true }
+orbiterx-protocol = { workspace = true }
+orbiterx-tools = { workspace = true }
+http = { workspace = true }
+schemars = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

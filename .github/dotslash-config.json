@@ -1,86 +1,86 @@
 {
   "outputs": {
-    "codex": {
+    "orbiterx": {
       "platforms": {
         "macos-aarch64": {
-          "regex": "^codex-package-aarch64-apple-darwin\\.tar\\.zst$",
-          "path": "bin/codex"
+          "regex": "^orbiterx-package-aarch64-apple-darwin\\.tar\\.zst$",
+          "path": "bin/orbiterx"
         },
         "macos-x86_64": {
-          "regex": "^codex-package-x86_64-apple-darwin\\.tar\\.zst$",
-          "path": "bin/codex"
+          "regex": "^orbiterx-package-x86_64-apple-darwin\\.tar\\.zst$",
+          "path": "bin/orbiterx"
         },
         "linux-x86_64": {
-          "regex": "^codex-package-x86_64-unknown-linux-musl\\.tar\\.zst$",
-          "path": "bin/codex"
+          "regex": "^orbiterx-package-x86_64-unknown-linux-musl\\.tar\\.zst$",
+          "path": "bin/orbiterx"
         },
         "linux-aarch64": {
-          "regex": "^codex-package-aarch64-unknown-linux-musl\\.tar\\.zst$",
-          "path": "bin/codex"
+          "regex": "^orbiterx-package-aarch64-unknown-linux-musl\\.tar\\.zst$",
+          "path": "bin/orbiterx"
         },
         "windows-x86_64": {
-          "regex": "^codex-package-x86_64-pc-windows-msvc\\.tar\\.zst$",
-          "path": "bin/codex.exe"
+          "regex": "^orbiterx-package-x86_64-pc-windows-msvc\\.tar\\.zst$",
+          "path": "bin/orbiterx.exe"
         },
         "windows-aarch64": {
-          "regex": "^codex-package-aarch64-pc-windows-msvc\\.tar\\.zst$",
-          "path": "bin/codex.exe"
+          "regex": "^orbiterx-package-aarch64-pc-windows-msvc\\.tar\\.zst$",
+          "path": "bin/orbiterx.exe"
         }
       }
     },
-    "codex-app-server": {
+    "orbiterx-app-server": {
       "platforms": {
         "macos-aarch64": {
-          "regex": "^codex-app-server-package-aarch64-apple-darwin\\.tar\\.zst$",
-          "path": "bin/codex-app-server"
+          "regex": "^orbiterx-app-server-package-aarch64-apple-darwin\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server"
         },
         "macos-x86_64": {
-          "regex": "^codex-app-server-package-x86_64-apple-darwin\\.tar\\.zst$",
-          "path": "bin/codex-app-server"
+          "regex": "^orbiterx-app-server-package-x86_64-apple-darwin\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server"
         },
         "linux-x86_64": {
-          "regex": "^codex-app-server-package-x86_64-unknown-linux-musl\\.tar\\.zst$",
-          "path": "bin/codex-app-server"
+          "regex": "^orbiterx-app-server-package-x86_64-unknown-linux-musl\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server"
         },
         "linux-aarch64": {
-          "regex": "^codex-app-server-package-aarch64-unknown-linux-musl\\.tar\\.zst$",
-          "path": "bin/codex-app-server"
+          "regex": "^orbiterx-app-server-package-aarch64-unknown-linux-musl\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server"
         },
         "windows-x86_64": {
-          "regex": "^codex-app-server-package-x86_64-pc-windows-msvc\\.tar\\.zst$",
-          "path": "bin/codex-app-server.exe"
+          "regex": "^orbiterx-app-server-package-x86_64-pc-windows-msvc\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server.exe"
         },
         "windows-aarch64": {
-          "regex": "^codex-app-server-package-aarch64-pc-windows-msvc\\.tar\\.zst$",
-          "path": "bin/codex-app-server.exe"
+          "regex": "^orbiterx-app-server-package-aarch64-pc-windows-msvc\\.tar\\.zst$",
+          "path": "bin/orbiterx-app-server.exe"
         }
       }
     },
-    "codex-responses-api-proxy": {
+    "orbiterx-responses-api-proxy": {
       "platforms": {
         "macos-aarch64": {
-          "regex": "^codex-responses-api-proxy-aarch64-apple-darwin\\.zst$",
-          "path": "codex-responses-api-proxy"
+          "regex": "^orbiterx-responses-api-proxy-aarch64-apple-darwin\\.zst$",
+          "path": "orbiterx-responses-api-proxy"
         },
         "macos-x86_64": {
-          "regex": "^codex-responses-api-proxy-x86_64-apple-darwin\\.zst$",
-          "path": "codex-responses-api-proxy"
+          "regex": "^orbiterx-responses-api-proxy-x86_64-apple-darwin\\.zst$",
+          "path": "orbiterx-responses-api-proxy"
         },
         "linux-x86_64": {
-          "regex": "^codex-responses-api-proxy-x86_64-unknown-linux-musl\\.zst$",
-          "path": "codex-responses-api-proxy"
+          "regex": "^orbiterx-responses-api-proxy-x86_64-unknown-linux-musl\\.zst$",
+          "path": "orbiterx-responses-api-proxy"
         },
         "linux-aarch64": {
-          "regex": "^codex-responses-api-proxy-aarch64-unknown-linux-musl\\.zst$",
-          "path": "codex-responses-api-proxy"
+          "regex": "^orbiterx-responses-api-proxy-aarch64-unknown-linux-musl\\.zst$",
+          "path": "orbiterx-responses-api-proxy"
         },
         "windows-x86_64": {
-          "regex": "^codex-responses-api-proxy-x86_64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-responses-api-proxy.exe"
+          "regex": "^orbiterx-responses-api-proxy-x86_64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-responses-api-proxy.exe"
         },
         "windows-aarch64": {
-          "regex": "^codex-responses-api-proxy-aarch64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-responses-api-proxy.exe"
+          "regex": "^orbiterx-responses-api-proxy-aarch64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-responses-api-proxy.exe"
         }
       }
     },
@@ -96,27 +96,27 @@
         }
       }
     },
-    "codex-command-runner": {
+    "orbiterx-command-runner": {
       "platforms": {
         "windows-x86_64": {
-          "regex": "^codex-command-runner-x86_64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-command-runner.exe"
+          "regex": "^orbiterx-command-runner-x86_64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-command-runner.exe"
         },
         "windows-aarch64": {
-          "regex": "^codex-command-runner-aarch64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-command-runner.exe"
+          "regex": "^orbiterx-command-runner-aarch64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-command-runner.exe"
         }
       }
     },
-    "codex-windows-sandbox-setup": {
+    "orbiterx-windows-sandbox-setup": {
       "platforms": {
         "windows-x86_64": {
-          "regex": "^codex-windows-sandbox-setup-x86_64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-windows-sandbox-setup.exe"
+          "regex": "^orbiterx-windows-sandbox-setup-x86_64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-windows-sandbox-setup.exe"
         },
         "windows-aarch64": {
-          "regex": "^codex-windows-sandbox-setup-aarch64-pc-windows-msvc\\.exe\\.zst$",
-          "path": "codex-windows-sandbox-setup.exe"
+          "regex": "^orbiterx-windows-sandbox-setup-aarch64-pc-windows-msvc\\.exe\\.zst$",
+          "path": "orbiterx-windows-sandbox-setup.exe"
         }
       }
     }

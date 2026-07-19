@@ -1,0 +1,7 @@
+load("//:defs.bzl", "orbiterx_rust_crate")
+
+orbiterx_rust_crate(
+    name = "test-binary-support",
+    crate_name = "orbiterx_test_binary_support",
+    crate_srcs = ["lib.rs"],
+)
