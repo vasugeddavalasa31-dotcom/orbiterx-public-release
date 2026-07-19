@@ -1,71 +1,58 @@
-<p align="center"><strong>OrbiterX CLI</strong> is a coding agent from OpenAI that runs locally on your computer.
-<p align="center">
-  <img src="https://github.com/openai/orbiterx/blob/main/.github/orbiterx-cli-splash.png" alt="OrbiterX CLI splash" width="80%" />
-</p>
-</br>
-If you want OrbiterX in your code editor (VS Code, Cursor, Windsurf), <a href="https://developers.openai.com/orbiterx/ide">install in your IDE.</a>
-</br>If you want the desktop app experience, run <code>orbiterx app</code> or visit <a href="https://chatgpt.com/orbiterx?app-landing-page=true">the OrbiterX App page</a>.
-</br>If you are looking for the <em>cloud-based agent</em> from OpenAI, <strong>OrbiterX Web</strong>, go to <a href="https://chatgpt.com/orbiterx">chatgpt.com/orbiterx</a>.</p>
+# OrbiterX
+
+> **OrbiterX** is a powerful multi-agent coding IDE and CLI designed to supercharge your software development workflow. Originally forked from OpenAI's Codex CLI, OrbiterX brings agentic coding directly to your terminal and local computer.
+
+## Built with ❤️ in India
+**Built on Codex CLI (Apache-2.0) with ❤️ in India**
 
 ---
 
-## Quickstart
+## What is OrbiterX?
 
-### Installing and running OrbiterX CLI
+OrbiterX is a local-first, multi-agent coding assistant that works directly within your repository. It coordinates multiple specialized agent sub-processes (e.g., Codebase Researcher, Database Debugger, and Executor agents) to handle complex refactors, run tests, diagnose errors, and carry out large-scale implementation tasks on your local workspace.
 
-Run the following on Mac or Linux to install OrbiterX CLI:
+## Features
 
+- **Multi-Agent Orchestration**: Out-of-the-box support for spawning concurrent specialized subagents to divide and conquer complex developer tasks.
+- **Local Sandbox Execution**: Secure process isolation using macOS Seatbelt (`sandbox-exec`), Linux Bubblewrap, and Windows Job Objects.
+- **Deep Codebase Awareness**: Ingests your repository layout, indexing files, code symbols, and workspace dependencies incrementally.
+- **Rich Interactive UI (TUI)**: A gorgeous Terminal User Interface powered by `ratatui` with terminal logs, file trees, composer editors, and image rendering.
+- **IDE Extensions**: Seamlessly integrates with VS Code, Cursor, Windsurf, and other major code editors.
+- **Tool & MCP Integration**: Extensible model interaction via the Model Context Protocol (MCP) and custom tool calls.
+
+---
+
+## Installation
+
+### Mac or Linux
+To install OrbiterX CLI on macOS or Linux, run:
 ```shell
-curl -fsSL https://chatgpt.com/orbiterx/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/vasugeddavalasa31-dotcom/rustorbiterx/main/scripts/install/install.sh | sh
 ```
 
-Run the following on Windows to install OrbiterX CLI:
-
-```shell
-powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/orbiterx/install.ps1 | iex"
+### Windows
+To install OrbiterX CLI on Windows, run the following in PowerShell:
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/vasugeddavalasa31-dotcom/rustorbiterx/main/scripts/install/install.ps1 | iex"
 ```
 
-OrbiterX CLI can also be installed via the following package managers:
-
+### From Source
+Alternatively, you can build OrbiterX directly from source:
 ```shell
-# Install using npm
-npm install -g @openai/orbiterx
+# Clone the repository
+git clone https://github.com/vasugeddavalasa31-dotcom/rustorbiterx.git
+cd rustorbiterx/orbiterx-rs
+
+# Build the release binary
+cargo build --release
 ```
 
-```shell
-# Install using Homebrew
-brew install --cask orbiterx
-```
+Once installed, simply run the `orbiterx` command to launch the CLI.
 
-Then simply run `orbiterx` to get started.
+---
 
-<details>
-<summary>You can also go to the <a href="https://github.com/openai/orbiterx/releases/latest">latest GitHub Release</a> and download the appropriate binary for your platform.</summary>
+## Attribution
 
-Each GitHub Release contains many executables, but in practice, you likely want one of these:
+OrbiterX is a fork of OpenAI's Codex CLI (`openai/codex`). We are deeply grateful to the original creators and contributors of the Codex CLI codebase.
 
-- macOS
-  - Apple Silicon/arm64: `orbiterx-aarch64-apple-darwin.tar.gz`
-  - x86_64 (older Mac hardware): `orbiterx-x86_64-apple-darwin.tar.gz`
-- Linux
-  - x86_64: `orbiterx-x86_64-unknown-linux-musl.tar.gz`
-  - arm64: `orbiterx-aarch64-unknown-linux-musl.tar.gz`
-
-Each archive contains a single entry with the platform baked into the name (e.g., `orbiterx-x86_64-unknown-linux-musl`), so you likely want to rename it to `orbiterx` after extracting it.
-
-</details>
-
-### Using OrbiterX with your ChatGPT plan
-
-Run `orbiterx` and select **Sign in with ChatGPT**. We recommend signing into your ChatGPT account to use OrbiterX as part of your Plus, Pro, Business, Edu, or Enterprise plan. [Learn more about what's included in your ChatGPT plan](https://help.openai.com/en/articles/11369540-orbiterx-in-chatgpt).
-
-You can also use OrbiterX with an API key, but this requires [additional setup](https://developers.openai.com/orbiterx/auth#sign-in-with-an-api-key).
-
-## Docs
-
-- [**OrbiterX Documentation**](https://developers.openai.com/orbiterx)
-- [**Contributing**](./docs/contributing.md)
-- [**Installing & building**](./docs/install.md)
-- [**Open source fund**](./docs/open-source-fund.md)
-
-This repository is licensed under the [Apache-2.0 License](LICENSE).
+This project is licensed under the Apache-2.0 License. All original copyright notices, attributions, and license conditions have been preserved in accordance with the Apache-2.0 license. See [ATTRIBUTION.md](./ATTRIBUTION.md) and the [LICENSE](./LICENSE) file for more information.
