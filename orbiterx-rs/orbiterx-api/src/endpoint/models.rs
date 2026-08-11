@@ -9,7 +9,52 @@ use orbiterx_client::HttpTransport;
 use orbiterx_client::RequestTelemetry;
 use orbiterx_protocol::openai_models::ModelInfo;
 use orbiterx_protocol::openai_models::ModelsResponse;
+use serde::Deserialize;
 use std::sync::Arc;
+
+/// OpenAI-standard `/models` list entry (e.g. DeepSeek returns
+/// `{"object":"list","data":[{"id": "...", "owned_by": "..."}]}`).
+#[derive(Deserialize)]
+struct OpenAiModelListEntry {
+    id: String,
+    #[serde(default)]
+    owned_by: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OpenAiModelListResponse {
+    data: Vec<OpenAiModelListEntry>,
+}
+
+/// Maps an OpenAI-standard model list entry to a minimal [`ModelInfo`].
+///
+/// OpenAI-compatible providers (DeepSeek and friends) only report `id` and
+/// `owned_by`, not OrbiterX's richer metadata. Deserializing through the
+/// `#[serde(default)]` fields on [`ModelInfo`] keeps the model picker
+/// populated with the provider's real models instead of falling back to the
+/// bundled GPT catalog.
+fn model_info_from_openai_entry(entry: OpenAiModelListEntry) -> Option<ModelInfo> {
+    serde_json::from_value(serde_json::json!({
+        "slug": entry.id,
+        "display_name": entry.id,
+        "description": entry.owned_by.map(|owned_by| format!("openai \u{00b7} {owned_by}")),
+        "supported_reasoning_levels": [
+            {"effort": "low", "description": "Low"},
+            {"effort": "medium", "description": "Medium"},
+            {"effort": "high", "description": "High"},
+        ],
+        "shell_type": "shell_command",
+        "visibility": "list",
+        "supported_in_api": true,
+        "priority": 0,
+        "base_instructions": "",
+        "support_verbosity": false,
+        "truncation_policy": {"mode": "bytes", "limit": 10000},
+        "supports_parallel_tool_calls": true,
+        "experimental_supported_tools": [],
+    }))
+    .ok()
+}
 
 pub struct ModelsClient<T: HttpTransport> {
     session: EndpointSession<T>,
@@ -67,13 +112,27 @@ impl<T: HttpTransport> ModelsClient<T> {
             .and_then(|value| value.to_str().ok())
             .map(ToString::to_string);
 
-        let ModelsResponse { models } = serde_json::from_slice::<ModelsResponse>(&resp.body)
-            .map_err(|e| {
-                ApiError::Stream(format!(
-                    "failed to decode models response: {e}; body: {}",
-                    String::from_utf8_lossy(&resp.body)
-                ))
-            })?;
+        let models = match serde_json::from_slice::<ModelsResponse>(&resp.body) {
+            Ok(ModelsResponse { models }) => models,
+            Err(_) => {
+                // Some OpenAI-compatible providers (e.g. DeepSeek) serve the
+                // standard `{"object":"list","data":[...]}` shape instead of
+                // OrbiterX's `{"models":[...]}`. Map their entries to minimal
+                // ModelInfos so the picker reflects the configured provider
+                // instead of falling back to the bundled GPT catalog.
+                let list =
+                    serde_json::from_slice::<OpenAiModelListResponse>(&resp.body).map_err(|e| {
+                        ApiError::Stream(format!(
+                            "failed to decode models response: {e}; body: {}",
+                            String::from_utf8_lossy(&resp.body)
+                        ))
+                    })?;
+                list.data
+                    .into_iter()
+                    .filter_map(model_info_from_openai_entry)
+                    .collect()
+            }
+        };
 
         Ok((models, header_etag))
     }
@@ -264,5 +323,52 @@ mod tests {
 
         assert_eq!(models.len(), 0);
         assert_eq!(etag, Some("\"abc\"".to_string()));
+    }
+
+    #[derive(Clone)]
+    struct RawBodyTransport {
+        body: Vec<u8>,
+    }
+
+    impl HttpTransport for RawBodyTransport {
+        async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
+            Ok(Response {
+                status: StatusCode::OK,
+                headers: HeaderMap::new(),
+                body: self.body.clone().into(),
+            })
+        }
+
+        async fn stream(&self, _req: Request) -> Result<StreamResponse, TransportError> {
+            Err(TransportError::Build("stream should not run".to_string()))
+        }
+    }
+
+    #[tokio::test]
+    async fn parses_openai_standard_models_list() {
+        // DeepSeek and other OpenAI-compatible providers return
+        // `{"object":"list","data":[{"id":...}]}` instead of OrbiterX's
+        // `{"models":[...]}` — the picker must still show those models.
+        let body = br#"{"object":"list","data":[
+            {"id":"deepseek-v4-flash","object":"model","owned_by":"deepseek"},
+            {"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}
+        ]}"#;
+        let transport = RawBodyTransport {
+            body: body.to_vec(),
+        };
+
+        let provider = provider("https://api.deepseek.com/v1");
+        let request_url = ModelsClient::<RawBodyTransport>::request_url(&provider, "0.1.0");
+        let client = ModelsClient::new(transport, provider, Arc::new(DummyAuth));
+
+        let (models, _) = client
+            .list_models(request_url, HeaderMap::new())
+            .await
+            .expect("request should succeed");
+
+        let slugs: Vec<&str> = models.iter().map(|model| model.slug.as_str()).collect();
+        assert_eq!(slugs, vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
+        assert!(models.iter().all(|model| model.supported_in_api));
+        assert!(models.iter().all(|model| model.display_name == model.slug));
     }
 }
