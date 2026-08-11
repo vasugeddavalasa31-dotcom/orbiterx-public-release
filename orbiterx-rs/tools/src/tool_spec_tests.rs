@@ -115,18 +115,23 @@ fn web_search_config_converts_to_responses_api_types() {
 #[test]
 fn create_tools_json_for_responses_api_includes_top_level_name() {
     assert_eq!(
-        create_tools_json_for_responses_api(&[ToolSpec::Function(ResponsesApiTool {
-            name: "demo".to_string(),
-            description: "A demo tool".to_string(),
-            strict: false,
-            defer_loading: None,
-            parameters: JsonSchema::object(
-                BTreeMap::from([("foo".to_string(), JsonSchema::string(/*description*/ None),)]),
-                /*required*/ None,
-                /*additional_properties*/ None
-            ),
-            output_schema: None,
-        })])
+        create_tools_json_for_responses_api(
+            &[ToolSpec::Function(ResponsesApiTool {
+                name: "demo".to_string(),
+                description: "A demo tool".to_string(),
+                strict: false,
+                defer_loading: None,
+                parameters: JsonSchema::object(
+                    BTreeMap::from([
+                        ("foo".to_string(), JsonSchema::string(/*description*/ None),)
+                    ]),
+                    /*required*/ None,
+                    /*additional_properties*/ None
+                ),
+                output_schema: None,
+            })],
+            /*flatten_namespaces*/ false,
+        )
         .expect("serialize tools"),
         vec![json!({
             "type": "function",

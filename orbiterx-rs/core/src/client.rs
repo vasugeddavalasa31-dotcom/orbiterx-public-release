@@ -201,6 +201,12 @@ fn session_telemetry_for_request(
 struct ModelClientState {
     thread_id: ThreadId,
     provider: SharedModelProvider,
+    #[allow(dead_code)]
+    api_key: Option<String>,
+    #[allow(dead_code)]
+    base_url: Option<String>,
+    #[allow(dead_code)]
+    provider_type: Option<String>,
     auth_env_telemetry: AuthEnvTelemetry,
     session_source: SessionSource,
     originator: String,
@@ -426,6 +432,9 @@ impl ModelClient {
         concurrent_reasoning_summaries_enabled: bool,
         attestation_provider: Option<Arc<dyn AttestationProvider>>,
         http_client_factory: HttpClientFactory,
+        api_key: Option<String>,
+        base_url: Option<String>,
+        provider_type: Option<String>,
     ) -> Self {
         let model_provider = create_model_provider(provider_info, auth_manager);
         let orbiterx_api_key_env_enabled = model_provider
@@ -439,6 +448,9 @@ impl ModelClient {
             state: Arc::new(ModelClientState {
                 thread_id,
                 provider: model_provider,
+                api_key,
+                base_url,
+                provider_type,
                 auth_env_telemetry,
                 session_source,
                 originator,
@@ -840,7 +852,10 @@ impl ModelClient {
                 .iter_mut()
                 .for_each(ResponseItem::clear_internal_chat_message_metadata_passthrough);
         }
-        let tools = create_tools_json_for_responses_api(&prompt.tools)?;
+        // OpenAI accepts OrbiterX's `namespace` tool grouping; other
+        // Responses providers (DeepSeek, OGX) only accept standard tool tags,
+        // so flatten namespaces into their contained functions there.
+        let tools = create_tools_json_for_responses_api(&prompt.tools, !is_openai)?;
         let (instructions, tools) = if model_info.use_responses_lite {
             let mut prefix = vec![ResponseItem::AdditionalTools {
                 id: None,

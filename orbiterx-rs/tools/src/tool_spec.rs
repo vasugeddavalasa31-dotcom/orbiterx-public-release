@@ -2,6 +2,7 @@ use crate::FreeformTool;
 use crate::JsonSchema;
 use crate::LoadableToolSpec;
 use crate::ResponsesApiNamespace;
+use crate::ResponsesApiNamespaceTool;
 use crate::ResponsesApiTool;
 use orbiterx_protocol::config_types::WebSearchContextSize;
 use orbiterx_protocol::config_types::WebSearchFilters as ConfigWebSearchFilters;
@@ -76,10 +77,34 @@ impl From<LoadableToolSpec> for ToolSpec {
 /// https://platform.openai.com/docs/guides/function-calling?api-mode=responses
 pub fn create_tools_json_for_responses_api(
     tools: &[ToolSpec],
+    flatten_namespaces: bool,
 ) -> Result<Vec<Value>, serde_json::Error> {
     let mut tools_json = Vec::new();
 
     for tool in tools {
+        // `namespace` is an OrbiterX grouping wrapper; the Responses API (and
+        // strict gateways like OGX) only accept standard tool tags. Flatten
+        // namespace entries into their contained function tools so the model
+        // still sees every callable (names are already namespace-prefixed).
+        if flatten_namespaces {
+            match tool {
+                ToolSpec::Namespace(namespace) => {
+                    for inner in &namespace.tools {
+                        if let ResponsesApiNamespaceTool::Function(function) = inner {
+                            tools_json
+                                .push(serde_json::to_value(ToolSpec::Function(function.clone()))?);
+                        }
+                    }
+                    continue;
+                }
+                // More OrbiterX-only tool tags that strict Responses gateways
+                // (OGX) reject. The model still sees every real callable —
+                // namespaces are flattened above — so these wrappers are safe
+                // to omit for non-OpenAI providers.
+                ToolSpec::ToolSearch { .. } | ToolSpec::Freeform(_) => continue,
+                _ => {}
+            }
+        }
         let json = serde_json::to_value(tool)?;
         tools_json.push(json);
     }
