@@ -173,6 +173,14 @@ def sanitize_error(raw: str) -> str:
     safe = [l for l in lines if not l.strip().startswith("File \"")]
     return " ".join(safe[:3])
 
+def _sse_error_event(message: str) -> bytes:
+    """Serialize a gateway error as a valid SSE `data:` event the OrbiterX client can parse.
+
+    The client only reads `data:` lines, so errors emitted as raw JSON are
+    invisible and leave the conversation hanging with no response.
+    """
+    return f"data: {json.dumps({'type': 'error', 'error': {'message': message}})}\n\n".encode()
+
 # ------------------------------------------------------------------------------
 # APP & MIDDLEWARE
 # ------------------------------------------------------------------------------
@@ -236,6 +244,8 @@ async def http_responses_proxy(request: Request):
     start = time.monotonic()
     error_msg = ""
     target_url = f"{OGX_URL.rstrip('/')}/v1/responses"
+    upstream_client = None
+    upstream_resp = None
 
     try:
         body = await request.body()
@@ -243,21 +253,54 @@ async def http_responses_proxy(request: Request):
         req_headers.pop("host", None)
         req_headers.pop("content-length", None)
 
+        # Open the upstream request eagerly so non-2xx OGX replies are
+        # forwarded with their real HTTP status instead of being streamed back
+        # as a 200 SSE body. The OrbiterX client only reads `data:` lines, so
+        # a raw JSON error body otherwise leaves it hanging with no response.
+        upstream_client = httpx.AsyncClient(timeout=TURN_TIMEOUT_SECS)
+        upstream_resp = await upstream_client.send(
+            upstream_client.build_request("POST", target_url, content=body, headers=req_headers),
+            stream=True,
+        )
+        if upstream_resp.status_code >= 400:
+            status_code = upstream_resp.status_code
+            raw = await upstream_resp.aread()
+            detail = raw.decode(errors="ignore")[:2000]
+            error_msg = f"OGX upstream error: HTTP {status_code}"
+            await upstream_resp.aclose()
+            await upstream_client.aclose()
+            return JSONResponse(
+                status_code=status_code,
+                content={"type": "error", "error": {"message": error_msg, "detail": detail}},
+            )
+
         async def stream_generator():
             nonlocal error_msg
             try:
-                async with httpx.AsyncClient(timeout=TURN_TIMEOUT_SECS) as client:
-                    async with client.stream("POST", target_url, content=body, headers=req_headers) as resp:
-                        async for chunk in resp.aiter_bytes():
-                            yield chunk
+                async for chunk in upstream_resp.aiter_bytes():
+                    yield chunk
             except httpx.TimeoutException:
                 error_msg = "Gateway timeout waiting for OGX response"
-                yield json.dumps({"type": "error", "error": {"message": error_msg}}).encode() + b"\n\n"
+                yield _sse_error_event(error_msg)
             except Exception as exc:
                 error_msg = sanitize_error(str(exc))
-                yield json.dumps({"type": "error", "error": {"message": error_msg}}).encode() + b"\n\n"
+                yield _sse_error_event(error_msg)
+            finally:
+                await upstream_resp.aclose()
+                await upstream_client.aclose()
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+    except Exception as exc:
+        error_msg = sanitize_error(str(exc))
+        if upstream_resp is not None:
+            await upstream_resp.aclose()
+        if upstream_client is not None:
+            await upstream_client.aclose()
+        return JSONResponse(
+            status_code=502,
+            content={"type": "error", "error": {"message": f"Gateway failed to reach OGX: {error_msg}"}},
+        )
 
     finally:
         duration_ms = int((time.monotonic() - start) * 1000)
