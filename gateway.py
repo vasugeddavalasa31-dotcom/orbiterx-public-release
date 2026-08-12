@@ -326,7 +326,7 @@ async def websocket_responses_proxy(websocket: WebSocket):
 async def health():
     ogx_ok = False
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.get(f"{OGX_URL.rstrip('/')}/health")
             ogx_ok = res.status_code in (200, 401, 403)
     except Exception:
