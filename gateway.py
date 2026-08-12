@@ -328,7 +328,7 @@ async def health():
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             res = await client.get(f"{OGX_URL.rstrip('/')}/health")
-            ogx_ok = res.status_code == 200
+            ogx_ok = res.status_code in (200, 401, 403)
     except Exception:
         ogx_ok = False
 
