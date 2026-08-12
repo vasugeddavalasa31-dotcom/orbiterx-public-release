@@ -14,7 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # ENVIRONMENT CONFIGURATION
 # ------------------------------------------------------------------------------
 # Target OGX Server URL (defaults to OGX standard port 8321)
-OGX_URL = os.getenv("OGX_URL", "https://ogxraiwy-production.up.railway.app")
+env_ogx = os.getenv("OGX_URL", "").strip()
+if not env_ogx or env_ogx in ("http://127.0.0.1:8321", "http://localhost:8321"):
+    OGX_URL = "https://ogxraiwy-production.up.railway.app"
+else:
+    OGX_URL = env_ogx
 
 # Admin dashboard / Cloudflare Worker endpoint for models listing fallback
 ADMIN_MODELS_URL     = os.getenv("ADMIN_MODELS_URL", "https://ox-handler-prod.vasugeddavalasa31.workers.dev/v1/models")
