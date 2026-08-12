@@ -8,6 +8,7 @@ use http::header::ETAG;
 use orbiterx_client::HttpTransport;
 use orbiterx_client::RequestTelemetry;
 use orbiterx_protocol::openai_models::ModelInfo;
+use orbiterx_protocol::protocol::MultiAgentVersion;
 use orbiterx_protocol::openai_models::ModelsResponse;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -19,6 +20,8 @@ struct OpenAiModelListEntry {
     id: String,
     #[serde(default)]
     owned_by: Option<String>,
+    #[serde(default)]
+    multi_agent_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -52,6 +55,7 @@ fn model_info_from_openai_entry(entry: OpenAiModelListEntry) -> Option<ModelInfo
         "truncation_policy": {"mode": "bytes", "limit": 10000},
         "supports_parallel_tool_calls": true,
         "experimental_supported_tools": [],
+        "multi_agent_version": entry.multi_agent_version,
     }))
     .ok()
 }
@@ -350,8 +354,8 @@ mod tests {
         // `{"object":"list","data":[{"id":...}]}` instead of OrbiterX's
         // `{"models":[...]}` — the picker must still show those models.
         let body = br#"{"object":"list","data":[
-            {"id":"deepseek-v4-flash","object":"model","owned_by":"deepseek"},
-            {"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}
+            {"id":"deepseek-v4-flash","object":"model","owned_by":"deepseek","multi_agent_version":"v2"},
+            {"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek","multi_agent_version":"v2"}
         ]}"#;
         let transport = RawBodyTransport {
             body: body.to_vec(),
@@ -370,5 +374,10 @@ mod tests {
         assert_eq!(slugs, vec!["deepseek-v4-flash", "deepseek-v4-pro"]);
         assert!(models.iter().all(|model| model.supported_in_api));
         assert!(models.iter().all(|model| model.display_name == model.slug));
+        // The gateway advertises V2 multi-agent support; it must survive the
+        // minimal-entry mapping or the app hides the sub-agent spawn tools.
+        assert!(models
+            .iter()
+            .all(|model| model.multi_agent_version == Some(MultiAgentVersion::V2)));
     }
 }
