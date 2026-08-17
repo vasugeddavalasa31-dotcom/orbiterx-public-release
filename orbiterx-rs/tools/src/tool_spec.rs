@@ -98,10 +98,12 @@ pub fn create_tools_json_for_responses_api(
                     continue;
                 }
                 // More OrbiterX-only tool tags that strict Responses gateways
-                // (OGX) reject. The model still sees every real callable —
-                // namespaces are flattened above — so these wrappers are safe
-                // to omit for non-OpenAI providers.
-                ToolSpec::ToolSearch { .. } | ToolSpec::Freeform(_) => continue,
+                // reject. Tool-search is client-side tooling with no model
+                // callable; freeform/custom tools (e.g. apply_patch) are kept —
+                // the Responses API defines a `custom` tool tag, and OGX now
+                // surfaces custom calls back to the client as custom_tool_call
+                // items. The model still sees every real callable.
+                ToolSpec::ToolSearch { .. } => continue,
                 _ => {}
             }
         }

@@ -470,12 +470,6 @@
             "code_mode_only": {
               "type": "boolean"
             },
-            "orbiterx_git_commit": {
-              "type": "boolean"
-            },
-            "orbiterx_hooks": {
-              "type": "boolean"
-            },
             "collab": {
               "type": "boolean"
             },
@@ -591,6 +585,12 @@
               "$ref": "#/definitions/FeatureToml_for_NetworkProxyConfigToml"
             },
             "non_prefixed_mcp_tool_names": {
+              "type": "boolean"
+            },
+            "orbiterx_git_commit": {
+              "type": "boolean"
+            },
+            "orbiterx_hooks": {
               "type": "boolean"
             },
             "personality": {
@@ -1729,6 +1729,11 @@
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
+        },
+        "supports_standalone_web_search": {
+          "default": false,
+          "description": "Whether this provider supports the standalone web-search endpoint.",
+          "type": "boolean"
         },
         "supports_websockets": {
           "default": false,
@@ -4672,6 +4677,13 @@
             "responses"
           ],
           "type": "string"
+        },
+        {
+          "description": "The standard Messages API exposed by Anthropic.",
+          "enum": [
+            "anthropicmessages"
+          ],
+          "type": "string"
         }
       ]
     },
@@ -4701,6 +4713,10 @@
         }
       ],
       "description": "When `false`, disables analytics across OrbiterX product surfaces in this machine. Defaults to `true`."
+    },
+    "api_key": {
+      "description": "Bring Your Own Key (BYOK) API key.",
+      "type": "string"
     },
     "approval_policy": {
       "allOf": [
@@ -4754,6 +4770,10 @@
       "format": "uint64",
       "minimum": 0.0,
       "type": "integer"
+    },
+    "base_url": {
+      "description": "Bring Your Own Key (BYOK) base URL.",
+      "type": "string"
     },
     "chatgpt_base_url": {
       "description": "Base URL for requests to ChatGPT (as opposed to the OpenAI API).",
@@ -4902,12 +4922,6 @@
         "code_mode_only": {
           "type": "boolean"
         },
-        "orbiterx_git_commit": {
-          "type": "boolean"
-        },
-        "orbiterx_hooks": {
-          "type": "boolean"
-        },
         "collab": {
           "type": "boolean"
         },
@@ -5023,6 +5037,12 @@
           "$ref": "#/definitions/FeatureToml_for_NetworkProxyConfigToml"
         },
         "non_prefixed_mcp_tool_names": {
+          "type": "boolean"
+        },
+        "orbiterx_git_commit": {
+          "type": "boolean"
+        },
+        "orbiterx_hooks": {
           "type": "boolean"
         },
         "personality": {
@@ -5492,6 +5512,10 @@
         "$ref": "#/definitions/ProjectConfig"
       },
       "type": "object"
+    },
+    "provider_type": {
+      "description": "Bring Your Own Key (BYOK) provider type.",
+      "type": "string"
     },
     "realtime": {
       "allOf": [

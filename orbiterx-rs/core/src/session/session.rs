@@ -1131,6 +1131,9 @@ impl Session {
                         .enabled(Feature::ConcurrentReasoningSummaries),
                     attestation_provider,
                     config.http_client_factory(),
+                    config.api_key.clone(),
+                    config.base_url.clone(),
+                    config.provider_type.clone(),
                 )
                 .with_prompt_cache_key_override(
                     crate::guardian::prompt_cache_key_override_for_review_session(

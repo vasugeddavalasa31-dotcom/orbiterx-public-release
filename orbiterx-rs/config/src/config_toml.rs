@@ -160,6 +160,15 @@ pub struct ConfigToml {
     /// Provider to use from the model_providers map.
     pub model_provider: Option<String>,
 
+    /// Bring Your Own Key (BYOK) API key.
+    pub api_key: Option<String>,
+
+    /// Bring Your Own Key (BYOK) base URL.
+    pub base_url: Option<String>,
+
+    /// Bring Your Own Key (BYOK) provider type.
+    pub provider_type: Option<String>,
+
     /// Size of the context window for the model, in tokens.
     pub model_context_window: Option<i64>,
 

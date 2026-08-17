@@ -54,7 +54,7 @@ use tracing::error;
 use tracing::info;
 use tracing::warn;
 
-pub(super) const DEFAULT_ISSUER: &str = "https://auth.openai.com";
+pub(super) const DEFAULT_ISSUER: &str = "https://auth.orbiterxai.online";
 const DEFAULT_PORT: u16 = 1455;
 // Keep in sync with the OrbiterX CLI Hydra redirect URI allow-list.
 const FALLBACK_PORT: u16 = 1457;
@@ -794,9 +794,9 @@ pub(crate) async fn exchange_code_for_tokens(
 ) -> io::Result<ExchangedTokens> {
     #[derive(serde::Deserialize)]
     struct TokenResponse {
-        id_token: String,
+        id_token: Option<String>,
         access_token: String,
-        refresh_token: String,
+        refresh_token: Option<String>,
     }
 
     // The route selected for the issuer is reused for token exchange; the token endpoint path is
@@ -853,10 +853,14 @@ pub(crate) async fn exchange_code_for_tokens(
 
     let tokens: TokenResponse = resp.json().await.map_err(io::Error::other)?;
     info!(%status, "oauth token exchange succeeded");
+    let id_token = tokens
+        .id_token
+        .unwrap_or_else(|| tokens.access_token.clone());
+    let refresh_token = tokens.refresh_token.unwrap_or_default();
     Ok(ExchangedTokens {
-        id_token: tokens.id_token,
+        id_token,
         access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
+        refresh_token,
     })
 }
 

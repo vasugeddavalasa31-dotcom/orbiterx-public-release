@@ -1,3 +1,14 @@
-model = "gpt-5.1"
+model = "deepseek-v4-flash"
+model_provider = "orbiterx-gateway"
+base_url = "https://railway-gateway-production.up.railway.app/v1"
+model_reasoning_effort = "medium"
 
-# Consider setting [mcp_servers] here!
+[model_providers.orbiterx-gateway]
+name = "OrbiterX Gateway"
+# Railway gateway (deployed). Local passthrough test was 127.0.0.1:8030.
+# NOTE: no `supports_websockets` — OGX does not serve the Responses WebSocket
+# endpoint (rejects with 403), and the app's WS parser stalls on reasoning
+# events. The app must use the HTTP/SSE transport against the gateway.
+base_url = "https://railway-gateway-production.up.railway.app/v1"
+wire_api = "responses"
+auth = { command = "echo", args = ["d8fd41d7de573a2f1bda411d25ac380921fefbd6af5b3657"], timeout_ms = 5000, refresh_interval_ms = 10000, cwd = "/" }

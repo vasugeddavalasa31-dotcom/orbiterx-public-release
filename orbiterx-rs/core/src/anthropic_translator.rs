@@ -144,11 +144,11 @@ fn append_or_merge_message(
     role: &str,
     mut blocks: Vec<AnthropicContent>,
 ) {
-    if let Some(last) = messages.last_mut() {
-        if last.role == role {
-            last.content.append(&mut blocks);
-            return;
-        }
+    if let Some(last) = messages.last_mut()
+        && last.role == role
+    {
+        last.content.append(&mut blocks);
+        return;
     }
     messages.push(AnthropicMessage {
         role: role.to_string(),

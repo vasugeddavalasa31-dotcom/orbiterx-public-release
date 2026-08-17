@@ -247,7 +247,7 @@ Payload:
 ```
 You may also see them addressed as to=/root/..., which indicates your identity is /root/...
 "#;
-const DEFAULT_MULTI_AGENT_V2_MODEL_OVERRIDE_USAGE_HINT_TEXT: &str = "Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides. Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"` or a positive integer string.";
+const DEFAULT_MULTI_AGENT_V2_MODEL_OVERRIDE_USAGE_HINT_TEXT: &str = "Full-history forks (`fork_turns` set to `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides; the default (`fork_turns` omitted) spawns the subagent with only its task and accepts overrides. Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, keep `fork_turns` unset (default) or use a positive integer string.";
 const DEFAULT_MULTI_AGENT_V2_TOOL_NAMESPACE: &str = "collaboration";
 const DEFAULT_MULTI_AGENT_V2_SHARED_USAGE_HINT_TEXT: &str = r#"Note that collaboration tools cannot be called from inside `functions.exec`. Call `spawn_agent`, `send_message`, `followup_task`, `wait_agent`, `interrupt_agent`, and `list_agents` only as direct tool calls using the recipient shown in their tool definitions, such as `to=functions.collaboration.spawn_agent`, since they are intentionally absent from the `functions.exec` `tools.*` namespace. Available tools in `functions.exec` are explicitly described with a `tools` namespace in the developer message.
 
@@ -642,6 +642,10 @@ pub struct Config {
 
     /// Key into the model_providers map that specifies which provider to use.
     pub model_provider_id: String,
+
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub provider_type: Option<String>,
 
     /// Info needed to make an API request to the model.
     pub model_provider: ModelProviderInfo,
@@ -2449,6 +2453,9 @@ pub struct ConfigOverrides {
     pub permission_profile: Option<PermissionProfile>,
     pub default_permissions: Option<String>,
     pub model_provider: Option<String>,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub provider_type: Option<String>,
     pub service_tier: Option<Option<String>>,
     pub orbiterx_self_exe: Option<PathBuf>,
     pub orbiterx_linux_sandbox_exe: Option<PathBuf>,
@@ -3106,6 +3113,9 @@ impl Config {
             permission_profile,
             default_permissions: default_permissions_override,
             model_provider,
+            api_key: override_api_key,
+            base_url: override_base_url,
+            provider_type: override_provider_type,
             service_tier: service_tier_override,
             orbiterx_self_exe,
             orbiterx_linux_sandbox_exe,
@@ -3551,6 +3561,23 @@ impl Config {
             })?
             .clone();
 
+        let api_key = override_api_key
+            .or_else(|| std::env::var("ORBITERX_API_KEY").ok())
+            .or(cfg.api_key)
+            .or_else(|| {
+                use orbiterx_keyring_store::KeyringStore;
+                orbiterx_keyring_store::DefaultKeyringStore
+                    .load("orbiterx", "byok_api_key")
+                    .ok()
+                    .flatten()
+            });
+
+        let base_url = override_base_url
+            .or(cfg.base_url);
+
+        let provider_type = override_provider_type
+            .or(cfg.provider_type);
+
         let shell_environment_policy = cfg.shell_environment_policy.into();
         let allow_login_shell = cfg.allow_login_shell.unwrap_or(true);
 
@@ -3692,7 +3719,7 @@ impl Config {
 
         let forced_login_method = cfg.forced_login_method;
 
-        let model = model.or(cfg.model);
+        let model = model.or_else(|| std::env::var("ORBITERX_MODEL").ok()).or(cfg.model);
         let notices = cfg.notice.unwrap_or_default();
         let service_tier = match service_tier_override {
             Some(Some(service_tier)) => Some(service_tier),
@@ -3909,6 +3936,9 @@ impl Config {
                 .model_auto_compact_token_limit_scope
                 .unwrap_or_default(),
             model_provider_id,
+            api_key,
+            base_url,
+            provider_type,
             model_provider,
             cwd: resolved_cwd,
             workspace_roots: workspace_roots.clone(),

@@ -2290,6 +2290,7 @@ fn websocket_provider_with_connect_timeout(
         websocket_connect_timeout_ms,
         requires_openai_auth: false,
         supports_websockets: true,
+        supports_standalone_web_search: true,
     }
 }
 
@@ -2400,6 +2401,9 @@ async fn websocket_harness_with_provider_options(
             .enabled(Feature::ConcurrentReasoningSummaries),
         /*attestation_provider*/ None,
         http_client_factory,
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     );
 
     WebsocketTestHarness {

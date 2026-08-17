@@ -1,0 +1,55 @@
+# ── .dockerignore — keep the Docker build context small ───────────────────────
+# Only gateway.py + orbiterx_gateway/ need to go into the image.
+
+# Rust project (not needed in gateway image)
+orbiterx-rs/
+orbiterx-cli/
+orbiterx-standalone/
+target/
+out/
+
+# Frontend (built separately, deployed to Vercel/Netlify)
+frontend/
+node_modules/
+.next/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Dev / local files
+gateway.env
+*.env
+.env*
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docs / CI
+docs/
+.github/
+tools/
+scripts/
+patches/
+sdk/
+bazel/
+
+# Test / scratch
+test.txt
+scratch/
+
+# Node leftovers at root
+package.json
+package-lock.json
+flake.lock
+flake.nix
+justfile
+MODULE.bazel
+MODULE.bazel.lock
+BUILD.bazel
+defs.bzl

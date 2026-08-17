@@ -1468,6 +1468,7 @@ async fn send_provider_auth_request(server: &MockServer, auth: ModelProviderAuth
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        supports_standalone_web_search: false,
     };
 
     send_request_with_provider(provider).await;
@@ -1519,6 +1520,9 @@ async fn send_request_with_provider(provider: ModelProviderInfo) {
             .enabled(Feature::ConcurrentReasoningSummaries),
         /*attestation_provider*/ None,
         config.http_client_factory(),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     );
     let responses_metadata = test_turn_responses_metadata(&client, thread_id);
     let mut client_session = client.new_session();
@@ -1712,6 +1716,7 @@ async fn prefers_apikey_when_config_prefers_apikey_even_with_chatgpt_tokens() {
     let model_provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
         supports_websockets: false,
+        supports_standalone_web_search: false,
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
 
@@ -3210,6 +3215,7 @@ async fn azure_responses_request_includes_store_and_prefixed_item_ids() {
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        supports_standalone_web_search: false,
     };
 
     let orbiterx_home = TempDir::new().unwrap();
@@ -3255,6 +3261,9 @@ async fn azure_responses_request_includes_store_and_prefixed_item_ids() {
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
         config.http_client_factory(),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     );
     let responses_metadata = test_turn_responses_metadata(&client, thread_id);
     let mut client_session = client.new_session();
@@ -3869,6 +3878,7 @@ async fn azure_overrides_assign_properties_used_for_responses_url() {
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        supports_standalone_web_search: false,
     };
 
     // Init session
@@ -3958,6 +3968,7 @@ async fn env_var_overrides_loaded_auth() {
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        supports_standalone_web_search: false,
     };
 
     // Init session

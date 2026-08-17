@@ -21,6 +21,14 @@ pub struct SharedCliOptions {
     #[arg(long, short = 'm')]
     pub model: Option<String>,
 
+    /// API key for the model provider (BYOK).
+    #[arg(long = "api-key")]
+    pub api_key: Option<String>,
+
+    /// Custom provider base URL (BYOK).
+    #[arg(long = "provider-url")]
+    pub provider_url: Option<String>,
+
     /// Use open-source provider.
     #[arg(long = "oss", default_value_t = false)]
     pub oss: bool,
@@ -69,6 +77,8 @@ impl SharedCliOptions {
         let Self {
             images,
             model,
+            api_key,
+            provider_url,
             oss,
             oss_provider,
             config_profile_v2,
@@ -81,6 +91,8 @@ impl SharedCliOptions {
         let Self {
             images: root_images,
             model: root_model,
+            api_key: root_api_key,
+            provider_url: root_provider_url,
             oss: root_oss,
             oss_provider: root_oss_provider,
             config_profile_v2: root_config_profile_v2,
@@ -93,6 +105,12 @@ impl SharedCliOptions {
 
         if model.is_none() {
             model.clone_from(root_model);
+        }
+        if api_key.is_none() {
+            api_key.clone_from(root_api_key);
+        }
+        if provider_url.is_none() {
+            provider_url.clone_from(root_provider_url);
         }
         if *root_oss {
             *oss = true;
@@ -134,6 +152,8 @@ impl SharedCliOptions {
         let Self {
             images,
             model,
+            api_key,
+            provider_url,
             oss,
             oss_provider,
             config_profile_v2,
@@ -146,6 +166,12 @@ impl SharedCliOptions {
 
         if let Some(model) = model {
             self.model = Some(model);
+        }
+        if let Some(api_key) = api_key {
+            self.api_key = Some(api_key);
+        }
+        if let Some(provider_url) = provider_url {
+            self.provider_url = Some(provider_url);
         }
         if oss {
             self.oss = true;

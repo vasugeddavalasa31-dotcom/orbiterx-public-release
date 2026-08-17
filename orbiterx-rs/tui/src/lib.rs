@@ -1108,6 +1108,8 @@ pub async fn run_main(
 
     let overrides = ConfigOverrides {
         model,
+        api_key: cli.api_key.clone(),
+        base_url: cli.provider_url.clone(),
         approval_policy,
         sandbox_mode,
         cwd: cwd_override,
@@ -1121,7 +1123,7 @@ pub async fn run_main(
         ..Default::default()
     };
 
-    let config = load_config_or_exit(
+    let mut config = load_config_or_exit(
         cli_kv_overrides.clone(),
         overrides.clone(),
         loader_overrides.clone(),
@@ -1129,6 +1131,17 @@ pub async fn run_main(
         strict_config,
     )
     .await;
+
+    if let Err(e) =
+        orbiterx_core::providers::validation::run_interactive_startup_prompt_if_needed(&mut config)
+            .await
+    {
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!("Error during startup: {e}");
+        }
+        std::process::exit(1);
+    }
 
     remove_legacy_tui_log_file(config.orbiterx_home.as_path());
 

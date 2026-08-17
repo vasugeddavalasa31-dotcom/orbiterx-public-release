@@ -885,6 +885,7 @@ async fn multi_agent_v2_full_history_fork_accepts_explicit_service_tier() {
             function_payload(json!({
                 "message": "inspect this repo",
                 "task_name": "fork_with_tier",
+                "fork_turns": "all",
                 "service_tier": ServiceTier::Fast.request_value()
             })),
         ))
@@ -972,6 +973,65 @@ async fn multi_agent_v2_spawn_partial_fork_turns_allows_agent_type_override() {
     assert_eq!(snapshot.model, "gpt-5-role-override");
     assert_eq!(snapshot.model_provider_id, "ollama");
     assert_eq!(snapshot.reasoning_effort, Some(ReasoningEffort::Minimal));
+}
+
+#[tokio::test]
+async fn multi_agent_v2_spawn_defaults_to_no_history_fork() {
+    // The default `fork_turns` is `none`: the subagent receives only its task
+    // (the NEW_TASK message), not the parent's conversation history. A spawned
+    // subagent inheriting the parent's full history (e.g. "spawn two
+    // sub-agents") can confuse the child into re-spawning its own sub-agents.
+    let (mut session, mut turn) = make_session_and_context().await;
+    let manager = thread_manager();
+    let root = manager
+        .start_thread((*turn.config).clone())
+        .await
+        .expect("root thread should start");
+    session.services.agent_control = manager.agent_control();
+    session.thread_id = root.thread_id;
+    let mut config = (*turn.config).clone();
+    config
+        .features
+        .enable(Feature::MultiAgentV2)
+        .expect("test config should allow feature update");
+    set_turn_config(&mut turn, config);
+
+    let session = Arc::new(session);
+    let turn = Arc::new(turn);
+    let output = SpawnAgentHandlerV2::default()
+        .handle(invocation(
+            session.clone(),
+            turn.clone(),
+            "spawn_agent",
+            function_payload(json!({
+                "message": "Reply with exactly: alpha",
+                "task_name": "agent_a"
+            })),
+        ))
+        .await
+        .expect("spawn_agent should succeed");
+    let (content, _) = expect_text_output(output);
+    let result: serde_json::Value =
+        serde_json::from_str(&content).expect("spawn_agent result should be json");
+    assert_eq!(result["task_name"], "/root/agent_a");
+
+    let child_thread_id = session
+        .services
+        .agent_control
+        .resolve_agent_reference(session.thread_id, &turn.session_source, "agent_a")
+        .await
+        .expect("spawned task name should resolve");
+    let snapshot = manager
+        .get_thread(child_thread_id)
+        .await
+        .expect("spawned agent thread should exist")
+        .config_snapshot()
+        .await;
+
+    // Default fork_turns="none" -> the child is a fresh thread, not a fork of
+    // the parent's history, but it still inherits the parent's model/effort.
+    assert_eq!(snapshot.forked_from_thread_id, None);
+    assert_eq!(snapshot.model, turn.model_info.slug);
 }
 
 #[tokio::test]

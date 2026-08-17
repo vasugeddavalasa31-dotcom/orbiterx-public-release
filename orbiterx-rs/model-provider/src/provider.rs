@@ -262,6 +262,17 @@ impl ModelProvider for ConfiguredModelProvider {
         &self.info
     }
 
+    fn capabilities(&self) -> ProviderCapabilities {
+        // Only OpenAI accepts the Responses `namespace` tool grouping on the
+        // wire; the client flattens namespaces for every other configured
+        // provider (DeepSeek, OGX, ...). Report that here so tools are
+        // registered under their flat names and match what the model sees.
+        ProviderCapabilities {
+            namespace_tools: self.info.is_openai(),
+            ..ProviderCapabilities::default()
+        }
+    }
+
     fn auth_manager(&self) -> Option<Arc<AuthManager>> {
         self.auth_manager.clone()
     }
@@ -444,6 +455,7 @@ mod tests {
             websocket_connect_timeout_ms: None,
             requires_openai_auth: false,
             supports_websockets: false,
+            supports_standalone_web_search: false,
         }
     }
 

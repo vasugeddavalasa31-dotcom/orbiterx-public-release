@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandMark } from "@/components/landing/brand-mark"
 import { OrbitVisual } from "@/components/landing/orbit-visual"
+import { decodeJwtProperties } from "@/lib/auth-oauth"
 import { openUrl } from "@/lib/platform"
 import { codexPollDeviceCode, codexRequestDeviceCode } from "@/lib/api"
 import { isDesktop } from "@/lib/platform"
@@ -53,6 +54,7 @@ export default function LoginPage() {
     verificationUrl: string
     deviceAuthId: string
     interval: number
+    redirectUri?: string
   } | null>(null)
 
   useEffect(() => {
@@ -95,16 +97,31 @@ export default function LoginPage() {
         if (!active) return
         if (result.status === "success") {
           if (result.accessToken) {
-            localStorage.setItem("orbiterx_token", result.accessToken)
-            // Persist the token as the gateway provider key so model calls use
-            // the user's own auto-created key (landing-page login keys are
-            // registered in TiDB, so the gateway validates them per-user).
-            setOrbiterxGatewayApiKey(result.accessToken).catch((err) => {
-              console.warn(
-                "[login] failed to persist gateway API key:",
-                err
-              )
-            })
+            // The Rust sidecar completes the OAuth browser flow and returns
+            // the tokens. Keep the access token as the web session; the
+            // gateway key comes from the sidecar's token-exchange (`apiKey`)
+            // or, on web, from the token's `properties` claim. When the token
+            // is a per-user key itself (landing-page `sess_` flow, no JWT
+            // claims, no separate exchange key), use it directly as the
+            // gateway key — that is what the gateway validates.
+            localStorage.setItem("orbiterx_access_token", result.accessToken)
+            const props = decodeJwtProperties(result.accessToken)
+            const apiKey =
+              result.apiKey ?? props?.apiKey ?? result.accessToken
+            if (typeof apiKey === "string" && apiKey) {
+              try {
+                await setOrbiterxGatewayApiKey(apiKey)
+              } catch (err) {
+                console.error("[login] failed to persist gateway API key:", err)
+                setSsoStatus("error")
+                setSsoError(
+                  t("ssoSaveFailed", {
+                    message: err instanceof Error ? err.message : String(err),
+                  })
+                )
+                return
+              }
+            }
           }
           clearLogoutFlag()
           router.replace("/workspace")
@@ -154,9 +171,17 @@ export default function LoginPage() {
       if (res.ok) {
         localStorage.setItem("orbiterx_token", token.trim())
         // Same as SSO: make the gateway provider use the logged-in user's key.
-        setOrbiterxGatewayApiKey(token.trim()).catch((err) => {
-          console.warn("[login] failed to persist gateway API key:", err)
-        })
+        try {
+          await setOrbiterxGatewayApiKey(token.trim())
+        } catch (err) {
+          console.error("[login] failed to persist gateway API key:", err)
+          setError(
+            t("ssoSaveFailed", {
+              message: err instanceof Error ? err.message : String(err),
+            })
+          )
+          return
+        }
         clearLogoutFlag()
         router.replace("/workspace")
       } else if (res.status === 401) {
@@ -171,9 +196,11 @@ export default function LoginPage() {
     }
   }
 
-  // Start the hosted sign-in exactly like Settings → Agents: request a
-  // verification link, open it in the system browser (desktop) / a new tab
-  // (web), then poll until the account login completes and auto-redirect.
+  // Start the hosted sign-in. On desktop the Rust sidecar runs a short-lived
+  // localhost callback server and opens the auth server's authorize URL; the
+  // browser redirects back with a code, the sidecar exchanges it and returns
+  // the tokens, and this page polls for the result. On web this uses the
+  // authorize flow in a new tab, completed by /auth/callback.
   async function handleSso() {
     setSsoStatus("polling")
     setSsoError("")

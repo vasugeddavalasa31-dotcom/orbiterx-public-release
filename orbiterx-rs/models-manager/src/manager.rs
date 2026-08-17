@@ -4,12 +4,12 @@ use crate::config::ModelsManagerConfig;
 use crate::model_info;
 use orbiterx_http_client::HttpClientFactory;
 use orbiterx_login::AuthManager;
-use orbiterx_protocol::auth::AuthMode;
+
 use orbiterx_protocol::config_types::CollaborationModeMask;
 use orbiterx_protocol::error::Result as CoreResult;
 use orbiterx_protocol::openai_models::ModelInfo;
 use orbiterx_protocol::openai_models::ModelPreset;
-use orbiterx_protocol::openai_models::ModelVisibility;
+
 use orbiterx_protocol::openai_models::ModelsResponse;
 use std::fmt;
 use std::future::Future;
@@ -423,15 +423,7 @@ impl OpenAiModelsManager {
     async fn apply_remote_models(&self, models: Vec<ModelInfo>) {
         // Use the remote models list as the source of truth if it contains at least one
         // non-hidden model and the user is using ChatGPT auth.
-        let should_use_remote_models_only = !models.is_empty()
-            && models
-                .iter()
-                .any(|model| model.visibility == ModelVisibility::List)
-            && self.auth_manager.as_ref().is_some_and(|auth_manager| {
-                auth_manager
-                    .auth_mode()
-                    .is_some_and(AuthMode::has_chatgpt_account)
-            });
+        let should_use_remote_models_only = !models.is_empty();
         if should_use_remote_models_only {
             *self.remote_models.write().await = models;
             return;

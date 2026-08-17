@@ -8,8 +8,8 @@ use http::header::ETAG;
 use orbiterx_client::HttpTransport;
 use orbiterx_client::RequestTelemetry;
 use orbiterx_protocol::openai_models::ModelInfo;
-use orbiterx_protocol::protocol::MultiAgentVersion;
 use orbiterx_protocol::openai_models::ModelsResponse;
+use orbiterx_protocol::protocol::MultiAgentVersion;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -376,8 +376,10 @@ mod tests {
         assert!(models.iter().all(|model| model.display_name == model.slug));
         // The gateway advertises V2 multi-agent support; it must survive the
         // minimal-entry mapping or the app hides the sub-agent spawn tools.
-        assert!(models
-            .iter()
-            .all(|model| model.multi_agent_version == Some(MultiAgentVersion::V2)));
+        assert!(
+            models
+                .iter()
+                .all(|model| model.multi_agent_version == Some(MultiAgentVersion::V2))
+        );
     }
 }

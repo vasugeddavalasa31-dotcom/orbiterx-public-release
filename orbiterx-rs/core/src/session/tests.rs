@@ -520,6 +520,9 @@ fn test_model_client_session() -> crate::client::ModelClientSession {
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
         HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     )
     .new_session()
 }
@@ -5395,6 +5398,9 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
                 .enabled(Feature::ConcurrentReasoningSummaries),
             /*attestation_provider*/ None,
             config.http_client_factory(),
+            /*api_key*/ None,
+            /*base_url*/ None,
+            /*provider_type*/ None,
         ),
         code_mode_service: crate::tools::code_mode::CodeModeService::new(Arc::new(
             orbiterx_code_mode::InProcessCodeModeSessionProvider,
@@ -7562,6 +7568,9 @@ where
                 .enabled(Feature::ConcurrentReasoningSummaries),
             /*attestation_provider*/ None,
             config.http_client_factory(),
+            /*api_key*/ None,
+            /*base_url*/ None,
+            /*provider_type*/ None,
         ),
         code_mode_service: crate::tools::code_mode::CodeModeService::new(Arc::new(
             orbiterx_code_mode::InProcessCodeModeSessionProvider,

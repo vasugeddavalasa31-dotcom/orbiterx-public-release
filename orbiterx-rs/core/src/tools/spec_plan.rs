@@ -790,6 +790,13 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut
 #[instrument(level = "trace", skip_all)]
 fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
     let turn_context = context.step_context.turn.as_ref();
+    tracing::info!(
+        "multi-agent debug: collab_enabled={} version={:?} non_code_mode_only={} tool_namespace={:?}",
+        collab_tools_enabled(turn_context),
+        turn_context.multi_agent_version,
+        turn_context.config.multi_agent_v2.non_code_mode_only,
+        turn_context.config.multi_agent_v2.tool_namespace.as_deref(),
+    );
     if collab_tools_enabled(turn_context) {
         if multi_agent_v2_enabled(turn_context) {
             let exposure = if turn_context.config.multi_agent_v2.non_code_mode_only {

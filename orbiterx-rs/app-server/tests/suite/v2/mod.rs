@@ -72,6 +72,7 @@ mod sleep;
 mod thread_archive;
 mod thread_delete;
 mod thread_fork;
+mod thread_history_reconstruction;
 mod thread_inject_items;
 mod thread_list;
 mod thread_loaded_list;

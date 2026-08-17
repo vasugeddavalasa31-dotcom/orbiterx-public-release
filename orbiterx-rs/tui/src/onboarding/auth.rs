@@ -390,7 +390,7 @@ impl AuthModeWidget {
         let mut lines: Vec<Line> = vec![
             Line::from(vec![
                 "  ".into(),
-                "Sign in with ChatGPT to use OrbiterX as part of your paid plan".into(),
+                "Sign in with OrbiterX to start coding with AI".into(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -429,9 +429,9 @@ impl AuthModeWidget {
         };
 
         let chatgpt_description = if !self.is_chatgpt_login_allowed() {
-            "ChatGPT login is disabled"
+            "OrbiterX login is disabled"
         } else {
-            "Usage included with Plus, Pro, Business, and Enterprise plans"
+            "Sign in to your OrbiterX account"
         };
         let device_code_description = "Sign in from another device with a one-time code";
 
@@ -441,7 +441,7 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Sign in with ChatGPT",
+                        "Sign in with OrbiterX",
                         chatgpt_description,
                     ));
                 }
@@ -545,7 +545,7 @@ impl AuthModeWidget {
 
     fn render_chatgpt_success_message(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ Signed in with your ChatGPT account"
+            "✓ Signed in with your OrbiterX account"
                 .fg(Color::Green)
                 .into(),
             "".into(),
@@ -567,16 +567,8 @@ impl AuthModeWidget {
                 .dim()
                 .into(),
             "".into(),
-            "  Powered by your ChatGPT account".into(),
-            Line::from(vec![
-                "  Uses your plan's rate limits and ".into(),
-                crate::terminal_hyperlinks::osc8_hyperlink(
-                    "https://chatgpt.com/#settings",
-                    "training data preferences",
-                )
-                .underlined(),
-            ])
-            .dim(),
+            "  Powered by your OrbiterX account".into(),
+            Line::from(vec!["  Uses your plan's rate limits and settings".into()]).dim(),
             "".into(),
             Line::from(vec![
                 "  Press ".fg(Color::Cyan),
@@ -592,7 +584,7 @@ impl AuthModeWidget {
 
     fn render_chatgpt_success(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ Signed in with your ChatGPT account"
+            "✓ Signed in with your OrbiterX account"
                 .fg(Color::Green)
                 .into(),
         ];

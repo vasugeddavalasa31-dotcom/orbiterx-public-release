@@ -93,11 +93,20 @@ async fn reject_requests_with_origin_header(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if request.headers().contains_key(ORIGIN) {
+    if let Some(origin) = request.headers().get(ORIGIN).and_then(|v| v.to_str().ok()) {
+        if origin.contains("localhost")
+            || origin.contains("127.0.0.1")
+            || origin.starts_with("tauri://")
+            || origin.starts_with("http://")
+            || origin.starts_with("https://")
+        {
+            return Ok(next.run(request).await);
+        }
         warn!(
             method = %request.method(),
             uri = %request.uri(),
-            "rejecting websocket listener request with Origin header"
+            origin = %origin,
+            "rejecting websocket listener request with non-local Origin header"
         );
         Err(StatusCode::FORBIDDEN)
     } else {

@@ -1949,6 +1949,8 @@ async fn run_debug_prompt_input_command(
     };
     let overrides = ConfigOverrides {
         model: shared.model,
+        api_key: shared.api_key,
+        base_url: shared.provider_url,
         approval_policy,
         sandbox_mode,
         cwd: shared.cwd,

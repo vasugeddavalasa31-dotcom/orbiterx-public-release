@@ -1,0 +1,2 @@
+# Ignore binaries folder to prevent infinite rebuild loops from missing sidecar placeholder
+binaries/

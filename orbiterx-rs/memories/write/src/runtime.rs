@@ -266,6 +266,9 @@ impl MemoryStartupContext {
             /*concurrent_reasoning_summaries_enabled*/ false,
             /*attestation_provider*/ None,
             config.http_client_factory(),
+            /*api_key*/ None,
+            /*base_url*/ None,
+            /*provider_type*/ None,
         );
 
         let mut client_session = model_client.new_session();

@@ -35,7 +35,14 @@ const MAX_REQUEST_MAX_RETRIES: u64 = 100;
 const OPENAI_PROVIDER_NAME: &str = "OpenAI";
 const OPENAI_ACTOR_AUTHORIZATION_HEADER: &str = "x-openai-actor-authorization";
 pub const OPENAI_PROVIDER_ID: &str = "openai";
-pub const CHATGPT_ORBITERX_BASE_URL: &str = "https://chatgpt.com/backend-api/orbiterx";
+/// Default base URL for providers that do not specify one. Pointed at the
+/// OrbiterX gateway (the reverse proxy in front of OGX), matching where the
+/// desktop app routes model traffic.
+pub const ORBITERX_GATEWAY_BASE_URL: &str = "https://railway-gateway-production.up.railway.app/v1";
+/// Base URL used when a provider authenticates via a ChatGPT/OrbiterX account
+/// session (login-mode auth). In upstream Codex this is the ChatGPT backend;
+/// in OrbiterX it is the gateway, which validates the login-issued keys.
+pub const CHATGPT_ORBITERX_BASE_URL: &str = ORBITERX_GATEWAY_BASE_URL;
 const AMAZON_BEDROCK_PROVIDER_NAME: &str = "Amazon Bedrock";
 pub const AMAZON_BEDROCK_PROVIDER_ID: &str = "amazon-bedrock";
 pub const AMAZON_BEDROCK_GPT_5_5_MODEL_ID: &str = "openai.gpt-5.5";
@@ -145,6 +152,9 @@ pub struct ModelProviderInfo {
     /// Whether this provider supports the Responses API WebSocket transport.
     #[serde(default)]
     pub supports_websockets: bool,
+    /// Whether this provider supports the standalone web-search endpoint.
+    #[serde(default)]
+    pub supports_standalone_web_search: bool,
 }
 
 /// AWS SigV4 auth configuration for a model provider.
@@ -258,7 +268,7 @@ impl ModelProviderInfo {
         ) {
             CHATGPT_ORBITERX_BASE_URL
         } else {
-            "https://api.openai.com/v1"
+            ORBITERX_GATEWAY_BASE_URL
         };
         let base_url = self
             .base_url
@@ -367,6 +377,7 @@ impl ModelProviderInfo {
             websocket_connect_timeout_ms: None,
             requires_openai_auth: true,
             supports_websockets: true,
+            supports_standalone_web_search: true,
         }
     }
 
@@ -400,6 +411,7 @@ impl ModelProviderInfo {
             websocket_connect_timeout_ms: None,
             requires_openai_auth: false,
             supports_websockets: false,
+            supports_standalone_web_search: false,
         }
     }
 
@@ -547,6 +559,7 @@ pub fn create_oss_provider_with_base_url(base_url: &str, wire_api: WireApi) -> M
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        supports_standalone_web_search: false,
     }
 }
 

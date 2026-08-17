@@ -77,6 +77,7 @@ fn is_safe_to_call_with_exec(command: &[String]) -> bool {
             "cat" |
             "cd" |
             "cut" |
+            "du" |
             "echo" |
             "expr" |
             "false" |
@@ -89,6 +90,7 @@ fn is_safe_to_call_with_exec(command: &[String]) -> bool {
             "pwd" |
             "rev" |
             "seq" |
+            "sort" |
             "stat" |
             "tail" |
             "tr" |
@@ -353,6 +355,13 @@ mod tests {
             "--show-current"
         ])));
         assert!(is_safe_to_call_with_exec(&vec_str(&["base64"])));
+        // `du` and `sort` are pure read-only — disk usage listing and stream
+        // sorting have no side effects. Without them in the allowlist, a
+        // sub-agent running `du -sh` or `find ... | sort` raised an unanswered
+        // approval prompt and hung forever (its rollout froze mid-work while
+        // the parent's wait_agent blocked).
+        assert!(is_safe_to_call_with_exec(&vec_str(&["du", "-sh", "."])));
+        assert!(is_safe_to_call_with_exec(&vec_str(&["sort"])));
         assert!(is_safe_to_call_with_exec(&vec_str(&[
             "sed", "-n", "1,5p", "file.txt"
         ])));

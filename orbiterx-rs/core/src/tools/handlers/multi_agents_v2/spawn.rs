@@ -56,8 +56,26 @@ async fn handle_spawn_agent(
         .filter(|role| !role.is_empty());
 
     let message = message_content(args.message)?;
+    let prompt = message.clone();
     let session_source = turn.session_source.clone();
     let child_depth = next_thread_spawn_depth(&session_source);
+    session
+        .emit_turn_item_started(
+            &turn,
+            &TurnItem::CollabAgentToolCall(CollabAgentToolCallItem {
+                id: call_id.clone(),
+                tool: CollabAgentTool::SpawnAgent,
+                status: CollabAgentToolCallStatus::InProgress,
+                sender_thread_id: session.thread_id,
+                receiver_thread_ids: Vec::new(),
+                receiver_agents: Vec::new(),
+                prompt: Some(prompt.clone()),
+                model: args.model.clone(),
+                reasoning_effort: args.reasoning_effort.clone(),
+                agents_states: Default::default(),
+            }),
+        )
+        .await;
     let mut config =
         build_agent_spawn_config(&session.get_base_instructions().await, turn.as_ref())?;
     if let Some(service_tier) = args.service_tier.as_ref() {
@@ -134,6 +152,39 @@ async fn handle_spawn_agent(
         .as_ref()
         .and_then(|snapshot| snapshot.session_source.get_nickname())
         .or(spawned_agent.metadata.agent_nickname);
+    let effective_model = agent_snapshot
+        .as_ref()
+        .map(|snapshot| snapshot.model.clone())
+        .or_else(|| args.model.clone());
+    let effective_reasoning_effort = agent_snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.reasoning_effort.clone())
+        .or(args.reasoning_effort.clone());
+    session
+        .emit_turn_item_completed(
+            &turn,
+            TurnItem::CollabAgentToolCall(CollabAgentToolCallItem {
+                id: call_id.clone(),
+                tool: CollabAgentTool::SpawnAgent,
+                status: CollabAgentToolCallStatus::Completed,
+                sender_thread_id: session.thread_id,
+                receiver_thread_ids: vec![new_thread_id],
+                receiver_agents: vec![CollabAgentRef {
+                    thread_id: new_thread_id,
+                    agent_nickname: nickname.clone(),
+                    agent_role: agent_snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.session_source.get_agent_role()),
+                }],
+                prompt: Some(prompt),
+                model: effective_model,
+                reasoning_effort: effective_reasoning_effort,
+                agents_states: [(new_thread_id, spawned_agent.status.clone())]
+                    .into_iter()
+                    .collect(),
+            }),
+        )
+        .await;
     emit_sub_agent_activity(
         &session,
         &turn,
@@ -196,7 +247,7 @@ impl SpawnAgentArgs {
             .as_deref()
             .map(str::trim)
             .filter(|fork_turns| !fork_turns.is_empty())
-            .unwrap_or("all");
+            .unwrap_or("none");
 
         if fork_turns.eq_ignore_ascii_case("none") {
             return Ok(None);

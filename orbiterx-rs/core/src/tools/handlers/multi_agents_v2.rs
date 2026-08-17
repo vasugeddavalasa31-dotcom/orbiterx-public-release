@@ -19,6 +19,7 @@ use orbiterx_protocol::items::SubAgentActivityItem;
 use orbiterx_protocol::items::TurnItem;
 use orbiterx_protocol::models::ResponseInputItem;
 use orbiterx_protocol::openai_models::ReasoningEffort;
+use orbiterx_protocol::protocol::CollabAgentRef;
 use orbiterx_protocol::protocol::InterAgentCommunication;
 use orbiterx_protocol::protocol::SubAgentActivityKind;
 use orbiterx_tools::ToolName;

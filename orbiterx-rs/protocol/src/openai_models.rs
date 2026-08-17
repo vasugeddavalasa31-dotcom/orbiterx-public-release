@@ -627,7 +627,7 @@ impl From<ModelInfo> for ModelPreset {
                 upgrade_copy: None,
                 migration_markdown: Some(upgrade.migration_markdown.clone()),
             }),
-            show_in_picker: info.visibility == ModelVisibility::List,
+            show_in_picker: info.visibility != ModelVisibility::Hide,
             multi_agent_version: info.multi_agent_version,
             availability_nux: info.availability_nux,
             supported_in_api: info.supported_in_api,

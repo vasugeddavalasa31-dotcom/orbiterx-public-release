@@ -1,0 +1,126 @@
+# Build the OrbiterX Windows standalone .exe and publish it (plus the
+# electron-builder autoupdate manifest) to the public release repo:
+#   vasugeddavalasa31-dotcom/orbiterx-public-release
+#
+# The standalone desktop client is the Electron app in `orbiterx-standalone/`
+# (`electron-vite` + `electron-builder`). It spawns the Rust `orbiterx` binary
+# (`orbiterx-rs` CLI, `app-server` subcommand) which is staged into
+# `orbiterx-standalone/resources/orbiterx.exe` before packaging, matching the
+# `binaryPath()` lookup in `orbiterx-standalone/src/main/index.ts`.
+#
+# Trigger: manual (workflow_dispatch) with a version, or a pushed tag `v*.*.*`.
+# The tag name must be the release version prefixed with `v`, e.g. tag `v1.2.39`.
+#
+# Required repository secret:
+#   PUBLIC_RELEASE_TOKEN — a GitHub PAT with `repo` scope on the
+#   `orbiterx-public-release` repo (the default GITHUB_TOKEN cannot write to a
+#   different repository).
+
+name: Build Windows EXE & Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.2.39 (leave blank to read orbiterx-standalone/package.json)"
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_REPO: vasugeddavalasa31-dotcom/orbiterx-public-release
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: orbiterx-rs
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($v)) {
+            $pkg = Get-Content -Raw orbiterx-standalone/package.json | ConvertFrom-Json
+            $v = [string]$pkg.version
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Resolved version: $v"
+
+      - name: Build orbiterx CLI (release)
+        working-directory: orbiterx-rs
+        run: cargo build -p orbiterx-cli --release
+
+      - name: Stage orbiterx.exe for Electron packaging
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force orbiterx-standalone/resources | Out-Null
+          Copy-Item orbiterx-rs/target/release/orbiterx.exe orbiterx-standalone/resources/orbiterx.exe -Force
+          Get-Item orbiterx-standalone/resources/orbiterx.exe | Select-Object Name, Length
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Build renderer + package Windows EXE
+        working-directory: orbiterx-standalone
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pnpm exec electron-builder --win nsis --publish never `
+            --config.extraMetadata.version="$env:VERSION"
+
+      - name: List packaged artifacts
+        shell: pwsh
+        run: Get-ChildItem orbiterx-standalone/dist | Select-Object Name, Length
+
+      - name: Publish assets to orbiterx-public-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $dist = "orbiterx-standalone/dist"
+          $assets = @(
+            "$dist/orbiterx-electron-win-x64.exe",
+            "$dist/orbiterx-electron-win-x64.exe.blockmap",
+            "$dist/latest.yml"
+          )
+          foreach ($a in $assets) {
+            if (-not (Test-Path $a)) { throw "Missing artifact: $a" }
+          }
+          if (gh release view "v$v" -R ${{ env.RELEASE_REPO }} --json tagName --jq .tagName 2>$null) {
+            Write-Host "Release v$v already exists — uploading assets (clobber)."
+            gh release upload "v$v" $assets -R ${{ env.RELEASE_REPO }} --clobber
+          } else {
+            Write-Host "Creating release v$v."
+            gh release create "v$v" $assets -R ${{ env.RELEASE_REPO }} --title "$v" --notes "OrbiterX Windows build v$v"
+          }
+          Write-Host "Published: https://github.com/${{ env.RELEASE_REPO }}/releases/tag/v$v"

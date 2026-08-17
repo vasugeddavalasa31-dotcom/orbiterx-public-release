@@ -210,184 +210,230 @@ pub(super) fn log_listener_attach_result(
     }
 }
 
-pub(super) async fn ensure_listener_task_running(
+pub(super) fn ensure_listener_task_running(
     listener_task_context: ListenerTaskContext,
     conversation_id: ThreadId,
     conversation: Arc<OrbiterXThread>,
     thread_state: Arc<Mutex<ThreadState>>,
-) -> Result<(), JSONRPCErrorError> {
-    let (cancel_tx, mut cancel_rx) = oneshot::channel();
-    let Some(mut unloading_state) = UnloadingState::new(
-        &listener_task_context,
-        conversation_id,
-        THREAD_UNLOADING_DELAY,
-    )
-    .await
-    else {
-        return Err(invalid_request(format!(
-            "thread {conversation_id} is closing; retry after the thread is closed"
-        )));
-    };
-    let config = conversation.config().await;
-    let environments = conversation.environment_selections().await;
-    let watch_registration = listener_task_context
-        .skills_watcher
-        .register_thread_config(
-            config.as_ref(),
-            listener_task_context.thread_manager.as_ref(),
-            &environments,
+) -> impl std::future::Future<Output = Result<(), JSONRPCErrorError>> + Send {
+    async move {
+        let (cancel_tx, mut cancel_rx) = oneshot::channel();
+        let Some(mut unloading_state) = UnloadingState::new(
+            &listener_task_context,
+            conversation_id,
+            THREAD_UNLOADING_DELAY,
         )
-        .await;
-    let thread_settings_baseline =
-        thread_settings_from_config_snapshot(&conversation.config_snapshot().await);
-    let (mut listener_command_rx, listener_generation) = {
-        let mut thread_state = thread_state.lock().await;
-        if thread_state.listener_matches(&conversation) {
-            return Ok(());
-        }
-        let (listener_command_rx, listener_generation) = thread_state.set_listener(
-            cancel_tx,
-            &conversation,
-            watch_registration,
-            thread_settings_baseline,
-        );
-        let Some(listener_command_tx) = thread_state.listener_command_tx() else {
-            tracing::warn!(
-                "thread listener command sender missing immediately after listener registration"
-            );
-            return Ok(());
+        .await
+        else {
+            return Err(invalid_request(format!(
+                "thread {conversation_id} is closing; retry after the thread is closed"
+            )));
         };
-        listener_task_context
-            .thread_state_manager
-            .register_listener_command_tx(conversation_id, listener_command_tx);
-        (listener_command_rx, listener_generation)
-    };
-    let ListenerTaskContext {
-        outgoing,
-        thread_manager,
-        thread_state_manager,
-        pending_thread_unloads,
-        thread_watch_manager,
-        thread_list_state_permit,
-        fallback_model_provider,
-        orbiterx_home,
-        ..
-    } = listener_task_context;
-    let outgoing_for_task = Arc::clone(&outgoing);
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                biased;
-                _ = &mut cancel_rx => {
-                    // Listener was superseded or the thread is being torn down.
-                    break;
-                }
-                listener_command = listener_command_rx.recv() => {
-                    let Some(listener_command) = listener_command else {
+        let config = conversation.config().await;
+        let environments = conversation.environment_selections().await;
+        let watch_registration = listener_task_context
+            .skills_watcher
+            .register_thread_config(
+                config.as_ref(),
+                listener_task_context.thread_manager.as_ref(),
+                &environments,
+            )
+            .await;
+        let thread_settings_baseline =
+            thread_settings_from_config_snapshot(&conversation.config_snapshot().await);
+        let (mut listener_command_rx, listener_generation) = {
+            let mut thread_state = thread_state.lock().await;
+            if thread_state.listener_matches(&conversation) {
+                return Ok(());
+            }
+            let (listener_command_rx, listener_generation) = thread_state.set_listener(
+                cancel_tx,
+                &conversation,
+                watch_registration,
+                thread_settings_baseline,
+            );
+            let Some(listener_command_tx) = thread_state.listener_command_tx() else {
+                tracing::warn!(
+                    "thread listener command sender missing immediately after listener registration"
+                );
+                return Ok(());
+            };
+            listener_task_context
+                .thread_state_manager
+                .register_listener_command_tx(conversation_id, listener_command_tx);
+            (listener_command_rx, listener_generation)
+        };
+        // The parent's listener loop attaches listeners to collab CHILD threads on
+        // spawn (see the CollabAgentSpawnEnd handling below), so it needs the full
+        // context — the loop itself only uses the destructured fields below.
+        let listener_task_context_for_children = listener_task_context.clone();
+        let ListenerTaskContext {
+            outgoing,
+            thread_manager,
+            thread_state_manager,
+            pending_thread_unloads,
+            thread_watch_manager,
+            thread_list_state_permit,
+            fallback_model_provider,
+            orbiterx_home,
+            ..
+        } = listener_task_context;
+        let outgoing_for_task = Arc::clone(&outgoing);
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = &mut cancel_rx => {
+                        // Listener was superseded or the thread is being torn down.
                         break;
-                    };
-                    handle_thread_listener_command(
-                        conversation_id,
-                        &conversation,
-                        orbiterx_home.as_path(),
-                        &thread_state_manager,
-                        &thread_state,
-                        &thread_watch_manager,
-                        &outgoing_for_task,
-                        &pending_thread_unloads,
-                        listener_command,
-                    )
-                    .await;
-                }
-                event = conversation.next_event() => {
-                    let event = match event {
-                        Ok(event) => event,
-                        Err(err) => {
-                            tracing::warn!("thread.next_event() failed with: {err}");
+                    }
+                    listener_command = listener_command_rx.recv() => {
+                        let Some(listener_command) = listener_command else {
                             break;
-                        }
-                    };
-
-                    // Track the event before emitting any typed translations
-                    // so thread-local state such as raw event opt-in stays
-                    // synchronized with the conversation.
-                    let raw_events_enabled = {
-                        let mut thread_state = thread_state.lock().await;
-                        thread_state.track_current_turn_event(&event.id, &event.msg);
-                        thread_state.experimental_raw_events
-                    };
-                    if matches!(
-                        &event.msg,
-                        EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
-                    ) && !raw_events_enabled
-                    {
-                        continue;
-                    }
-                    let subscribed_connection_ids = thread_state_manager
-                        .subscribed_connection_ids(conversation_id)
+                        };
+                        handle_thread_listener_command(
+                            conversation_id,
+                            &conversation,
+                            orbiterx_home.as_path(),
+                            &thread_state_manager,
+                            &thread_state,
+                            &thread_watch_manager,
+                            &outgoing_for_task,
+                            &pending_thread_unloads,
+                            listener_command,
+                        )
                         .await;
-                    let thread_outgoing = ThreadScopedOutgoingMessageSender::new(
-                        outgoing_for_task.clone(),
-                        subscribed_connection_ids,
-                        conversation_id,
-                    );
+                    }
+                    event = conversation.next_event() => {
+                        let event = match event {
+                            Ok(event) => event,
+                            Err(err) => {
+                                tracing::warn!("thread.next_event() failed with: {err}");
+                                break;
+                            }
+                        };
 
-                    apply_bespoke_event_handling(
-                        event.clone(),
-                        conversation_id,
-                        conversation.clone(),
-                        thread_manager.clone(),
-                        thread_outgoing,
-                        thread_state.clone(),
-                        thread_watch_manager.clone(),
-                        thread_list_state_permit.clone(),
-                        fallback_model_provider.clone(),
-                    )
-                    .await;
-                }
-                unloading_watchers_open = unloading_state.wait_for_unloading_trigger() => {
-                    if !unloading_watchers_open {
-                        break;
-                    }
-                    if !unloading_state.should_unload_now() {
-                        continue;
-                    }
-                    if matches!(conversation.agent_status().await, AgentStatus::Running) {
-                        unloading_state.note_thread_activity_observed();
-                        continue;
-                    }
-                    {
-                        let mut pending_thread_unloads = pending_thread_unloads.lock().await;
-                        if pending_thread_unloads.contains(&conversation_id) {
+                        // Track the event before emitting any typed translations
+                        // so thread-local state such as raw event opt-in stays
+                        // synchronized with the conversation.
+                        let raw_events_enabled = {
+                            let mut thread_state = thread_state.lock().await;
+                            thread_state.track_current_turn_event(&event.id, &event.msg);
+                            thread_state.experimental_raw_events
+                        };
+                        if matches!(
+                            &event.msg,
+                            EventMsg::RawResponseItem(_) | EventMsg::RawResponseCompleted(_)
+                        ) && !raw_events_enabled
+                        {
                             continue;
+                        }
+                        let subscribed_connection_ids = thread_state_manager
+                            .subscribed_connection_ids(conversation_id)
+                            .await;
+
+                        // A collab sub-agent spawns a NEW thread whose events (incl.
+                        // approval requests) only reach that thread's own
+                        // subscribers. Attach the PARENT's subscribed connections to
+                        // the child as listeners — `ensure_conversation_listener`
+                        // both subscribes the connection AND starts the child's
+                        // listener task, so the child's live items (thinking, tool
+                        // calls, agent-message deltas) stream to the browser while
+                        // it runs instead of only appearing after it completes (the
+                        // earlier `try_add_connection_to_thread` registered the
+                        // subscription but never started a listener loop, so no
+                        // child event ever reached the WebSocket). The spawned
+                        // child's thread id is extracted BEFORE the await so no
+                        // borrow of `event` (non-Send) crosses the `.await` and
+                        // breaks this listener task's `tokio::spawn` Send bound.
+                        // Idempotent — re-subscribing an already-present connection
+                        // is a no-op and the listener task starts once per thread.
+                        let spawned_child_thread_id = match &event.msg {
+                            EventMsg::CollabAgentSpawnEnd(spawn_end) => {
+                                spawn_end.new_thread_id
+                            }
+                            _ => None,
+                        };
+                        if let Some(child_thread_id) = spawned_child_thread_id {
+                            for parent_connection_id in &subscribed_connection_ids {
+                                log_listener_attach_result(
+                                    ensure_conversation_listener(
+                                        listener_task_context_for_children.clone(),
+                                        child_thread_id,
+                                        *parent_connection_id,
+                                        raw_events_enabled,
+                                    )
+                                    .await,
+                                    child_thread_id,
+                                    *parent_connection_id,
+                                    "thread",
+                                );
+                            }
+                        }
+
+                        let thread_outgoing = ThreadScopedOutgoingMessageSender::new(
+                            outgoing_for_task.clone(),
+                            subscribed_connection_ids,
+                            conversation_id,
+                        );
+
+                        apply_bespoke_event_handling(
+                            event.clone(),
+                            conversation_id,
+                            conversation.clone(),
+                            thread_manager.clone(),
+                            thread_outgoing,
+                            thread_state.clone(),
+                            thread_watch_manager.clone(),
+                            thread_list_state_permit.clone(),
+                            fallback_model_provider.clone(),
+                        )
+                        .await;
+                    }
+                    unloading_watchers_open = unloading_state.wait_for_unloading_trigger() => {
+                        if !unloading_watchers_open {
+                            break;
                         }
                         if !unloading_state.should_unload_now() {
                             continue;
                         }
-                        pending_thread_unloads.insert(conversation_id);
+                        if matches!(conversation.agent_status().await, AgentStatus::Running) {
+                            unloading_state.note_thread_activity_observed();
+                            continue;
+                        }
+                        {
+                            let mut pending_thread_unloads = pending_thread_unloads.lock().await;
+                            if pending_thread_unloads.contains(&conversation_id) {
+                                continue;
+                            }
+                            if !unloading_state.should_unload_now() {
+                                continue;
+                            }
+                            pending_thread_unloads.insert(conversation_id);
+                        }
+                        unload_thread_without_subscribers(
+                            thread_manager.clone(),
+                            outgoing_for_task.clone(),
+                            pending_thread_unloads.clone(),
+                            thread_state_manager.clone(),
+                            thread_watch_manager.clone(),
+                            conversation_id,
+                            conversation.clone(),
+                        )
+                        .await;
+                        break;
                     }
-                    unload_thread_without_subscribers(
-                        thread_manager.clone(),
-                        outgoing_for_task.clone(),
-                        pending_thread_unloads.clone(),
-                        thread_state_manager.clone(),
-                        thread_watch_manager.clone(),
-                        conversation_id,
-                        conversation.clone(),
-                    )
-                    .await;
-                    break;
                 }
             }
-        }
 
-        let mut thread_state = thread_state.lock().await;
-        if thread_state.listener_generation == listener_generation {
-            thread_state_manager.unregister_listener_command_tx(conversation_id);
-            thread_state.clear_listener();
-        }
-    });
-    Ok(())
+            let mut thread_state = thread_state.lock().await;
+            if thread_state.listener_generation == listener_generation {
+                thread_state_manager.unregister_listener_command_tx(conversation_id);
+                thread_state.clear_listener();
+            }
+        });
+        Ok(())
+    }
 }
 
 pub(super) async fn wait_for_thread_shutdown(thread: &Arc<OrbiterXThread>) -> ThreadShutdownResult {

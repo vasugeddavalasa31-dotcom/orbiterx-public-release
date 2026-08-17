@@ -725,6 +725,7 @@ export async function codexRequestDeviceCode(): Promise<{
   verificationUrl: string
   deviceAuthId: string
   interval: number
+  redirectUri?: string
 }> {
   return getTransport().call("codex_request_device_code", {})
 }
@@ -739,6 +740,7 @@ export async function codexPollDeviceCode(params: {
   accessToken?: string
   refreshToken?: string
   accountId?: string
+  apiKey?: string
 }> {
   return getTransport().call("codex_poll_device_code", {
     deviceAuthId: params.deviceAuthId,
@@ -3528,9 +3530,20 @@ export async function createModelProvider(params: {
  * bearer token. After login the app authenticates with the user's own key, so
  * the gateway sees per-user identity, rate limits, and billing.
  */
-export async function setOrbiterxGatewayApiKey(
-  apiKey: string
-): Promise<void> {
+export async function setOrbiterxGatewayApiKey(apiKey: string): Promise<void> {
+  // Ensure the login token is a provisioned per-user gateway key before
+  // persisting it. The gateway creates a workspace + billing + key row in TiDB
+  // on first use (idempotent), so subsequent logins with the same token reuse
+  // the existing key and usage records per user.
+  const provisioned = await provisionGatewayKey(apiKey).catch((err) => {
+    console.warn(
+      "[login] gateway key provision failed, continuing with raw token:",
+      err
+    )
+    return null
+  })
+  const effectiveKey = provisioned?.key ?? apiKey
+
   await getTransport().call("config/batchWrite", {
     edits: [
       {
@@ -3542,7 +3555,7 @@ export async function setOrbiterxGatewayApiKey(
           supports_websockets: false,
           auth: {
             command: "echo",
-            args: [apiKey],
+            args: [effectiveKey],
             timeout_ms: 5000,
             // Short refresh so a login key is picked up quickly after sign-in.
             refresh_interval_ms: 10000,
@@ -3559,6 +3572,84 @@ export async function setOrbiterxGatewayApiKey(
     ],
     reloadUserConfig: true,
   })
+}
+
+/**
+ * Remove the `orbiterx-gateway` provider entry from the user config. The login
+ * key is embedded in that entry's auth command, so clearing the provider is
+ * what actually removes the secret from disk after sign-out. Also resets the
+ * top-level `model_provider` and `enabled_providers` references so the config
+ * does not point at a provider that no longer exists (which makes the
+ * app-server refuse to reload the config). Best-effort: the transport may be
+ * unavailable mid-logout, and local sign-out never depends on this succeeding.
+ */
+export async function clearOrbiterxGatewayProvider(): Promise<void> {
+  try {
+    await getTransport().call("config/batchWrite", {
+      edits: [
+        {
+          keyPath: "model_providers.orbiterx-gateway",
+          value: null,
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "model_provider",
+          value: "openai-proxy",
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "enabled_providers",
+          value: ["openai-proxy", "ogx-gateway"],
+          mergeStrategy: "replace",
+        },
+      ],
+      reloadUserConfig: true,
+    })
+  } catch (err) {
+    console.warn("[logout] failed to clear gateway provider config:", err)
+  }
+}
+
+const GATEWAY_BASE_URL = "https://railway-gateway-production.up.railway.app"
+
+/**
+ * Register the login token as a per-user gateway key via POST /auth/provision.
+ * Idempotent: an already-provisioned token returns the existing key record.
+ */
+async function provisionGatewayKey(token: string): Promise<{
+  workspace_id: string
+  key_id: string
+  key: string
+  balance: number
+  provisioned: boolean
+} | null> {
+  const res = await fetch(`${GATEWAY_BASE_URL}/auth/provision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
+/**
+ * Invalidate a provisioned gateway key server-side (soft-deletes the TiDB key
+ * row). Idempotent and best-effort: returns true only when the gateway
+ * confirmed the revocation. Local sign-out never depends on this succeeding.
+ */
+export async function revokeOrbiterxGatewayKey(
+  token: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${GATEWAY_BASE_URL}/auth/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 export async function updateModelProvider(params: {

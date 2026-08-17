@@ -267,3 +267,56 @@ fn tool_search_tool_spec_serializes_expected_wire_shape() {
         })
     );
 }
+
+#[test]
+fn create_tools_json_keeps_freeform_tools_for_non_openai_providers() {
+    // Freeform/custom tools (e.g. apply_patch) must survive flattening for
+    // non-OpenAI providers: OGX accepts the Responses `custom` tool tag and
+    // surfaces custom calls back to the client as custom_tool_call items.
+    let tool = ToolSpec::Freeform(FreeformTool {
+        name: "apply_patch".to_string(),
+        description: "Edit files".to_string(),
+        format: FreeformToolFormat {
+            r#type: "grammar".to_string(),
+            syntax: "lark".to_string(),
+            definition: "start: begin_patch hunk+ end_patch".to_string(),
+        },
+    });
+
+    let tools = create_tools_json_for_responses_api(&[tool], /*flatten_namespaces*/ true)
+        .expect("serialize tools");
+
+    assert_eq!(
+        tools,
+        vec![json!({
+            "type": "custom",
+            "name": "apply_patch",
+            "description": "Edit files",
+            "format": {
+                "type": "grammar",
+                "syntax": "lark",
+                "definition": "start: begin_patch hunk+ end_patch",
+            },
+        })]
+    );
+}
+
+#[test]
+fn create_tools_json_drops_tool_search_for_non_openai_providers() {
+    // Tool-search remains client-side tooling with no model callable; it is
+    // still omitted for non-OpenAI providers.
+    let tool = ToolSpec::ToolSearch {
+        execution: "client".to_string(),
+        description: "Search tools".to_string(),
+        parameters: JsonSchema::object(
+            BTreeMap::new(),
+            /*required*/ None,
+            /*additional_properties*/ None,
+        ),
+    };
+
+    let tools = create_tools_json_for_responses_api(&[tool], /*flatten_namespaces*/ true)
+        .expect("serialize tools");
+
+    assert!(tools.is_empty());
+}

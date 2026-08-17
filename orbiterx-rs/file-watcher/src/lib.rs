@@ -649,10 +649,11 @@ impl FileWatcher {
             handle.spawn(async move {
                 loop {
                     match raw_rx.recv().await {
-                        Some(Ok(event)) => {
+                        Some(Ok(mut event)) => {
                             if !is_mutating_event(&event) {
                                 continue;
                             }
+                            event.paths.retain(|p| !is_ignored_path(p));
                             if event.paths.is_empty() {
                                 continue;
                             }
@@ -763,6 +764,21 @@ fn is_mutating_event(event: &Event) -> bool {
         event.kind,
         EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
     )
+}
+
+fn is_ignored_path(path: &Path) -> bool {
+    path.components().any(|c| {
+        if let std::path::Component::Normal(os_str) = c {
+            if let Some(s) = os_str.to_str() {
+                return s == ".git"
+                    || s == "node_modules"
+                    || s == "target"
+                    || s == "dist"
+                    || s == "build";
+            }
+        }
+        false
+    })
 }
 
 fn dedupe_watched_paths(mut watched_paths: Vec<WatchPath>) -> Vec<WatchPath> {

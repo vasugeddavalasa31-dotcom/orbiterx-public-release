@@ -270,6 +270,8 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
     let SharedCliOptions {
         images,
         model: model_cli_arg,
+        api_key,
+        provider_url,
         oss,
         oss_provider,
         config_profile_v2,
@@ -435,6 +437,9 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
         cwd: resolved_cwd,
         workspace_roots: None,
         model_provider: model_provider.clone(),
+        api_key,
+        base_url: provider_url,
+        provider_type: None,
         service_tier: None,
         orbiterx_self_exe: arg0_paths.orbiterx_self_exe.clone(),
         orbiterx_linux_sandbox_exe: arg0_paths.orbiterx_linux_sandbox_exe.clone(),

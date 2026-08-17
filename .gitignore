@@ -15,6 +15,33 @@ build/
 out/
 storybook-static/
 
+# Rust build outputs
+target/
+
+# frontend / desktop build outputs
+.next/
+frontend/out/
+frontend/public/vs/
+frontend/src-tauri/target/
+frontend/src-tauri/binaries/
+orbiterx-standalone/dist/
+orbiterx-standalone/resources/orbiterx.exe
+orbiterx-standalone/resources/orbiterx
+
+# cloudflare deploy state
+.wrangler/
+
+# local db / session state
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# distribution outputs (DMG etc.)
+distribution/
+
+# local tooling
+.zcode/
+
 # ignore README for publishing
 orbiterx-cli/README.md
 

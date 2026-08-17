@@ -960,17 +960,13 @@ pub(crate) async fn apply_bespoke_event_handling(
         }
         EventMsg::ViewImageToolCall(_) => {}
         EventMsg::ItemStarted(event) => {
-            let should_emit = match &event.item {
-                // Approval and guardian flows can emit the command start notification before core
-                // emits the canonical item. Reuse the same set to suppress that duplicate.
-                CoreTurnItem::CommandExecution(item) => thread_state
-                    .lock()
-                    .await
-                    .turn_summary
-                    .command_execution_started
-                    .insert(item.id.clone()),
-                _ => true,
-            };
+            let item_id = event.item.id().to_string();
+            let should_emit = thread_state
+                .lock()
+                .await
+                .turn_summary
+                .item_started
+                .insert(item_id);
             let dynamic_tool_call_params = match &event.item {
                 CoreTurnItem::DynamicToolCall(item) => Some(DynamicToolCallParams {
                     thread_id: conversation_id.to_string(),

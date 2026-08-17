@@ -8,6 +8,8 @@ use crate::protocol::item_builders::review_output_text;
 use crate::protocol::v2::CollabAgentState;
 use crate::protocol::v2::CollabAgentTool;
 use crate::protocol::v2::CollabAgentToolCallStatus;
+use crate::protocol::v2::CommandAction;
+use crate::protocol::v2::CommandExecutionSource;
 use crate::protocol::v2::CommandExecutionStatus;
 use crate::protocol::v2::DynamicToolCallOutputContentItem;
 use crate::protocol::v2::DynamicToolCallStatus;
@@ -29,6 +31,7 @@ use crate::protocol::v2::web_search_action_from_core;
 use orbiterx_extension_items::image_generation::ImageGenerationItem;
 use orbiterx_protocol::items::parse_hook_prompt_message;
 use orbiterx_protocol::models::MessagePhase;
+use orbiterx_protocol::parse_command::ParsedCommand;
 use orbiterx_protocol::protocol::AgentReasoningEvent;
 use orbiterx_protocol::protocol::AgentReasoningRawContentEvent;
 use orbiterx_protocol::protocol::AgentStatus;
@@ -61,12 +64,13 @@ use orbiterx_protocol::protocol::WebSearchBeginEvent;
 use orbiterx_protocol::protocol::WebSearchEndEvent;
 #[cfg(test)]
 use orbiterx_protocol::review_format::REVIEW_FALLBACK_MESSAGE;
+use orbiterx_shell_command::parse_command::parse_shell_script;
+use orbiterx_utils_absolute_path::AbsolutePathBuf;
+use orbiterx_utils_path_uri::LegacyAppPathString;
 use std::collections::HashMap;
 use tracing::warn;
 use uuid::Uuid;
 
-#[cfg(test)]
-use crate::protocol::v2::CommandAction;
 #[cfg(test)]
 use crate::protocol::v2::FileUpdateChange;
 #[cfg(test)]
@@ -238,6 +242,13 @@ pub struct ThreadHistoryBuilder {
     current_rollout_index: usize,
     next_rollout_index: usize,
     active_change_set: Option<ThreadHistoryChangeSet>,
+    /// Working directory carried by persisted `RolloutItem::WorldState` lines.
+    ///
+    /// The legacy turn rebuild path only has Responses API items (there are no
+    /// `item_started`/`exec_command` events), and `CommandExecution` items need
+    /// a `cwd` for shell-command classification. Response items do not carry a
+    /// cwd, so we recover the last one the rollout recorded.
+    response_cwd: Option<AbsolutePathBuf>,
 }
 
 impl Default for ThreadHistoryBuilder {
@@ -255,6 +266,7 @@ impl ThreadHistoryBuilder {
             current_rollout_index: 0,
             next_rollout_index: 0,
             active_change_set: None,
+            response_cwd: None,
         }
     }
 
@@ -391,10 +403,14 @@ impl ThreadHistoryBuilder {
             RolloutItem::EventMsg(event) => self.handle_event(event),
             RolloutItem::Compacted(payload) => self.handle_compacted(payload),
             RolloutItem::ResponseItem(item) => self.handle_response_item(item),
+            RolloutItem::WorldState(payload) => {
+                if let Some(cwd) = extract_response_cwd(&payload.state) {
+                    self.response_cwd = Some(cwd);
+                }
+            }
             RolloutItem::InterAgentCommunication(_)
             | RolloutItem::InterAgentCommunicationMetadata { .. }
             | RolloutItem::TurnContext(_)
-            | RolloutItem::WorldState(_)
             | RolloutItem::SessionMeta(_) => {}
         }
     }
@@ -436,29 +452,205 @@ impl ThreadHistoryBuilder {
     }
 
     fn handle_response_item(&mut self, item: &orbiterx_protocol::models::ResponseItem) {
-        let orbiterx_protocol::models::ResponseItem::Message {
-            role, content, id, ..
-        } = item
-        else {
-            return;
-        };
+        match item {
+            orbiterx_protocol::models::ResponseItem::Message {
+                role, content, id, ..
+            } => {
+                if role != "user" {
+                    return;
+                }
+                if let Some(hook_prompt) = parse_hook_prompt_message(id.as_deref(), content) {
+                    self.push_item_in_current_turn(ThreadItem::HookPrompt {
+                        id: hook_prompt.id,
+                        fragments: hook_prompt
+                            .fragments
+                            .into_iter()
+                            .map(crate::protocol::v2::HookPromptFragment::from)
+                            .collect(),
+                    });
+                }
+            }
+            orbiterx_protocol::models::ResponseItem::Reasoning {
+                summary, content, ..
+            } => {
+                // Persisted reasoning is only available as a Responses API
+                // item (there are no `agent_reasoning` events on the reload
+                // path). Surface it the same way the live path does so
+                // reloaded sessions keep their thinking block.
+                let mut summaries = Vec::with_capacity(summary.len());
+                for entry in summary {
+                    let orbiterx_protocol::models::ReasoningItemReasoningSummary::SummaryText {
+                        text,
+                    } = entry;
+                    summaries.push(text.clone());
+                }
+                let mut text = Vec::with_capacity(content.as_ref().map_or(0, Vec::len));
+                if let Some(content) = content {
+                    for entry in content {
+                        match entry {
+                            orbiterx_protocol::models::ReasoningItemContent::ReasoningText {
+                                text: entry_text,
+                            }
+                            | orbiterx_protocol::models::ReasoningItemContent::Text {
+                                text: entry_text,
+                            } => text.push(entry_text.clone()),
+                        }
+                    }
+                }
+                let reasoning_id = self.next_item_id();
+                self.push_item_in_current_turn(ThreadItem::Reasoning {
+                    id: reasoning_id,
+                    summary: summaries,
+                    content: text,
+                });
+            }
+            orbiterx_protocol::models::ResponseItem::FunctionCall {
+                name,
+                arguments,
+                call_id,
+                ..
+            } => {
+                self.push_item_in_current_turn(
+                    self.build_response_command_execution_item(name, arguments, call_id),
+                );
+            }
+            orbiterx_protocol::models::ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } => {
+                let text = output.body.to_text().filter(|text| !text.is_empty());
+                // The matching `FunctionCall` already created the
+                // `CommandExecution` item (with the recovered command and
+                // classification); patch its aggregated output in place rather
+                // than replacing it with an empty shell card.
+                let patched = {
+                    let turn = self.ensure_turn();
+                    match turn
+                        .items
+                        .iter_mut()
+                        .find(|item| item.id() == call_id.as_str())
+                    {
+                        Some(ThreadItem::CommandExecution {
+                            aggregated_output,
+                            status,
+                            ..
+                        }) => {
+                            *aggregated_output = text.clone();
+                            *status = CommandExecutionStatus::Completed;
+                            true
+                        }
+                        _ => false,
+                    }
+                };
+                if !patched {
+                    self.push_item_in_current_turn(ThreadItem::CommandExecution {
+                        id: call_id.clone(),
+                        command: String::new(),
+                        cwd: self.response_cwd_text(),
+                        process_id: None,
+                        source: CommandExecutionSource::Agent,
+                        status: CommandExecutionStatus::Completed,
+                        command_actions: Vec::new(),
+                        aggregated_output: text,
+                        exit_code: None,
+                        duration_ms: None,
+                    });
+                }
+            }
+            orbiterx_protocol::models::ResponseItem::CustomToolCall { .. }
+            | orbiterx_protocol::models::ResponseItem::ToolSearchCall { .. }
+            | orbiterx_protocol::models::ResponseItem::WebSearchCall { .. }
+            | orbiterx_protocol::models::ResponseItem::ImageGenerationCall { .. }
+            | orbiterx_protocol::models::ResponseItem::AgentMessage { .. }
+            | orbiterx_protocol::models::ResponseItem::LocalShellCall { .. }
+            | orbiterx_protocol::models::ResponseItem::CustomToolCallOutput { .. }
+            | orbiterx_protocol::models::ResponseItem::ToolSearchOutput { .. }
+            | orbiterx_protocol::models::ResponseItem::AdditionalTools { .. }
+            | orbiterx_protocol::models::ResponseItem::Compaction { .. }
+            | orbiterx_protocol::models::ResponseItem::CompactionTrigger { .. }
+            | orbiterx_protocol::models::ResponseItem::ContextCompaction { .. }
+            | orbiterx_protocol::models::ResponseItem::Other => {}
+        }
+    }
 
-        if role != "user" {
-            return;
+    /// Builds a `ThreadItem` from a persisted Responses API function call.
+    /// The rollout only stores the raw tool name and JSON arguments, so the
+    /// command string, working directory, and shell-command classification
+    /// (`commandActions`) are recovered here for shell tools; other tools
+    /// surface as dynamic tool calls the frontend already renders.
+    fn build_response_command_execution_item(
+        &self,
+        name: &str,
+        arguments: &str,
+        call_id: &str,
+    ) -> ThreadItem {
+        if name != "exec_command" {
+            return ThreadItem::DynamicToolCall {
+                id: call_id.to_string(),
+                namespace: None,
+                tool: name.to_string(),
+                arguments: serde_json::from_str(arguments)
+                    .unwrap_or_else(|_| serde_json::Value::String(arguments.to_string())),
+                status: DynamicToolCallStatus::Completed,
+                content_items: None,
+                success: None,
+                duration_ms: None,
+            };
         }
 
-        let Some(hook_prompt) = parse_hook_prompt_message(id.as_deref(), content) else {
-            return;
+        let arguments_value = serde_json::from_str::<serde_json::Value>(arguments).ok();
+        let command = arguments_value
+            .as_ref()
+            .and_then(|args| args.get("cmd"))
+            .and_then(serde_json::Value::as_str);
+        let Some(command) = command else {
+            return ThreadItem::CommandExecution {
+                id: call_id.to_string(),
+                command: String::new(),
+                cwd: self.response_cwd_text(),
+                process_id: None,
+                source: CommandExecutionSource::Agent,
+                status: CommandExecutionStatus::Completed,
+                command_actions: Vec::new(),
+                aggregated_output: None,
+                exit_code: None,
+                duration_ms: None,
+            };
         };
+        let workdir = arguments_value
+            .as_ref()
+            .and_then(|args| args.get("workdir"))
+            .and_then(serde_json::Value::as_str);
+        let cwd = match (workdir, self.response_cwd.as_ref()) {
+            (Some(workdir), _) => AbsolutePathBuf::from_absolute_path(workdir).ok(),
+            (None, Some(cwd)) => Some(cwd.clone()),
+            (None, None) => None,
+        };
+        let command_actions = parse_shell_script(command)
+            .into_iter()
+            .map(|parsed| response_command_action(parsed, cwd.as_ref()))
+            .collect();
+        ThreadItem::CommandExecution {
+            id: call_id.to_string(),
+            command: command.to_string(),
+            cwd: cwd
+                .as_ref()
+                .map(LegacyAppPathString::from_abs_path)
+                .unwrap_or_else(|| self.response_cwd_text()),
+            process_id: None,
+            source: CommandExecutionSource::Agent,
+            status: CommandExecutionStatus::Completed,
+            command_actions,
+            aggregated_output: None,
+            exit_code: None,
+            duration_ms: None,
+        }
+    }
 
-        self.push_item_in_current_turn(ThreadItem::HookPrompt {
-            id: hook_prompt.id,
-            fragments: hook_prompt
-                .fragments
-                .into_iter()
-                .map(crate::protocol::v2::HookPromptFragment::from)
-                .collect(),
-        });
+    fn response_cwd_text(&self) -> LegacyAppPathString {
+        self.response_cwd
+            .as_ref()
+            .map(LegacyAppPathString::from_abs_path)
+            .unwrap_or_else(|| LegacyAppPathString::from_string(""))
     }
 
     fn handle_user_message(&mut self, payload: &UserMessageEvent) {
@@ -1240,8 +1432,21 @@ impl ThreadHistoryBuilder {
     }
 
     fn handle_turn_complete(&mut self, payload: &TurnCompleteEvent) {
+        // A terminal error on the completion event means the turn did not finish
+        // successfully (e.g. the response stream disconnected before
+        // `response.completed`). Preserve it instead of silently marking the
+        // turn completed — otherwise persisted history shows an empty
+        // "completed" turn with no explanation of why the reply is missing.
+        let terminal_error = payload.error.as_ref().map(|error| V2TurnError {
+            message: error.message.clone(),
+            orbiterx_error_info: error.orbiterx_error_info.clone().map(Into::into),
+            additional_details: None,
+        });
         let mark_completed = |turn: &mut PendingTurn| {
-            if matches!(turn.status, TurnStatus::Completed | TurnStatus::InProgress) {
+            if let Some(error) = terminal_error.clone() {
+                turn.status = TurnStatus::Failed;
+                turn.error = Some(error);
+            } else if matches!(turn.status, TurnStatus::Completed | TurnStatus::InProgress) {
                 turn.status = TurnStatus::Completed;
             }
             turn.completed_at = payload.completed_at;
@@ -1266,7 +1471,10 @@ impl ThreadHistoryBuilder {
             .iter_mut()
             .find(|turn| turn.id == payload.turn_id)
         {
-            if matches!(turn.status, TurnStatus::Completed | TurnStatus::InProgress) {
+            if let Some(error) = terminal_error.clone() {
+                turn.status = TurnStatus::Failed;
+                turn.error = Some(error);
+            } else if matches!(turn.status, TurnStatus::Completed | TurnStatus::InProgress) {
                 turn.status = TurnStatus::Completed;
             }
             turn.completed_at = payload.completed_at;
@@ -1516,6 +1724,48 @@ fn upsert_turn_item(items: &mut Vec<ThreadItem>, item: ThreadItem) -> &ThreadIte
     let inserted_item_index = items.len();
     items.push(item);
     &items[inserted_item_index]
+}
+
+/// Converts an engine shell-command classification to a UI `CommandAction`.
+///
+/// `Read` actions resolve their relative path against the working directory;
+/// when no cwd is known the read is surfaced as an unknown command rather than
+/// fabricating a path.
+fn response_command_action(parsed: ParsedCommand, cwd: Option<&AbsolutePathBuf>) -> CommandAction {
+    match parsed {
+        ParsedCommand::Read { cmd, name, path } => match cwd {
+            Some(cwd) => CommandAction::Read {
+                command: cmd,
+                name,
+                path: cwd.join(path),
+            },
+            None => CommandAction::Unknown { command: cmd },
+        },
+        ParsedCommand::ListFiles { cmd, path } => CommandAction::ListFiles { command: cmd, path },
+        ParsedCommand::Search { cmd, query, path } => CommandAction::Search {
+            command: cmd,
+            query,
+            path,
+        },
+        ParsedCommand::Unknown { cmd } => CommandAction::Unknown { command: cmd },
+    }
+}
+
+/// Recovers the working directory recorded by a persisted world-state line so
+/// the response-item rebuild path can classify shell commands.
+fn extract_response_cwd(state: &serde_json::Value) -> Option<AbsolutePathBuf> {
+    let environments = state.pointer("/environments/environments")?;
+    let cwd = environments
+        .get("local")
+        .and_then(|env| env.get("cwd"))
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            environments
+                .as_object()?
+                .values()
+                .find_map(|env| env.get("cwd").and_then(serde_json::Value::as_str))
+        })?;
+    AbsolutePathBuf::from_absolute_path(cwd).ok()
 }
 
 struct PendingTurn {
@@ -1791,6 +2041,66 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn terminal_error_on_turn_complete_marks_turn_failed() {
+        // A turn whose response stream disconnected before completion persists a
+        // `TurnCompleteEvent` with `error` set and no agent message. The turn
+        // must surface as Failed with the error, not silently "completed" with
+        // an empty reply.
+        let events = vec![
+            EventMsg::TurnStarted(TurnStartedEvent {
+                turn_id: "turn-1".into(),
+                trace_id: None,
+                started_at: Some(1000),
+                model_context_window: Some(100),
+                collaboration_mode_kind: Default::default(),
+            }),
+            EventMsg::UserMessage(UserMessageEvent {
+                client_id: None,
+                message: "where are we?".into(),
+                images: None,
+                image_details: Vec::new(),
+                local_images: Vec::new(),
+                local_image_details: Vec::new(),
+                text_elements: Vec::new(),
+                ..Default::default()
+            }),
+            EventMsg::TurnComplete(TurnCompleteEvent {
+                turn_id: "turn-1".into(),
+                started_at: Some(1000),
+                last_agent_message: None,
+                error: Some(ErrorEvent {
+                    message: "stream disconnected before completion: stream closed before response.completed".into(),
+                    orbiterx_error_info: None,
+                }),
+                completed_at: Some(1030),
+                duration_ms: Some(30000),
+                time_to_first_token_ms: None,
+            }),
+        ];
+
+        let mut builder = ThreadHistoryBuilder::new();
+        for event in &events {
+            builder.handle_event(event);
+        }
+        let turns = builder.finish();
+
+        assert_eq!(turns.len(), 1);
+        assert_eq!(turns[0].status, TurnStatus::Failed);
+        assert_eq!(
+            turns[0].error,
+            Some(TurnError {
+                message:
+                    "stream disconnected before completion: stream closed before response.completed"
+                        .into(),
+                orbiterx_error_info: None,
+                additional_details: None,
+            })
+        );
+        assert_eq!(turns[0].started_at, Some(1000));
+        assert_eq!(turns[0].completed_at, Some(1030));
     }
 
     #[test]
@@ -4146,6 +4456,100 @@ mod tests {
         let turns = build_turns_from_rollout_items(&items);
         assert_eq!(turns.len(), 1);
         assert!(turns[0].items.is_empty());
+    }
+
+    #[test]
+    fn rebuilds_reasoning_and_tool_calls_from_persisted_response_items() {
+        let items = vec![
+            RolloutItem::WorldState(WorldStateItem {
+                full: true,
+                state: serde_json::json!({
+                    "environments": {
+                        "environments": {
+                            "local": { "cwd": "/tmp", "shell": "zsh", "status": "available" }
+                        }
+                    }
+                }),
+            }),
+            RolloutItem::EventMsg(EventMsg::TurnStarted(TurnStartedEvent {
+                turn_id: "turn-a".into(),
+                trace_id: None,
+                started_at: None,
+                model_context_window: None,
+                collaboration_mode_kind: Default::default(),
+            })),
+            RolloutItem::ResponseItem(orbiterx_protocol::models::ResponseItem::Reasoning {
+                id: Some(orbiterx_protocol::ResponseItemId::with_suffix("rz", "1")),
+                summary: vec![
+                    orbiterx_protocol::models::ReasoningItemReasoningSummary::SummaryText {
+                        text: "thinking summary".into(),
+                    },
+                ],
+                content: Some(vec![
+                    orbiterx_protocol::models::ReasoningItemContent::ReasoningText {
+                        text: "the user wants me to find ts files".into(),
+                    },
+                ]),
+                encrypted_content: None,
+                internal_chat_message_metadata_passthrough: None,
+            }),
+            RolloutItem::ResponseItem(orbiterx_protocol::models::ResponseItem::FunctionCall {
+                id: Some(orbiterx_protocol::ResponseItemId::with_suffix("fc", "1")),
+                name: "exec_command".into(),
+                namespace: None,
+                arguments: r#"{"cmd": "find . -name '*.ts'"}"#.into(),
+                call_id: "call-1".into(),
+                internal_chat_message_metadata_passthrough: None,
+            }),
+            RolloutItem::ResponseItem(
+                orbiterx_protocol::models::ResponseItem::FunctionCallOutput {
+                    id: Some(orbiterx_protocol::ResponseItemId::with_suffix("fco", "1")),
+                    call_id: "call-1".into(),
+                    output: orbiterx_protocol::models::FunctionCallOutputPayload::from_text(
+                        "./src/lib/types.ts".into(),
+                    ),
+                    internal_chat_message_metadata_passthrough: None,
+                },
+            ),
+            RolloutItem::EventMsg(EventMsg::TurnComplete(TurnCompleteEvent {
+                turn_id: "turn-a".into(),
+                started_at: None,
+                last_agent_message: None,
+                error: None,
+                completed_at: None,
+                duration_ms: None,
+                time_to_first_token_ms: None,
+            })),
+        ];
+
+        let turns = build_turns_from_rollout_items(&items);
+        assert_eq!(turns.len(), 1);
+        assert_eq!(
+            turns[0].items,
+            vec![
+                ThreadItem::Reasoning {
+                    id: "item-1".into(),
+                    summary: vec!["thinking summary".into()],
+                    content: vec!["the user wants me to find ts files".into()],
+                },
+                ThreadItem::CommandExecution {
+                    id: "call-1".into(),
+                    command: "find . -name '*.ts'".into(),
+                    cwd: LegacyAppPathString::from_string("/tmp"),
+                    process_id: None,
+                    source: CommandExecutionSource::Agent,
+                    status: CommandExecutionStatus::Completed,
+                    command_actions: vec![CommandAction::Search {
+                        command: "find . -name '*.ts'".into(),
+                        query: Some("*.ts".into()),
+                        path: Some(".".into()),
+                    }],
+                    aggregated_output: Some("./src/lib/types.ts".into()),
+                    exit_code: None,
+                    duration_ms: None,
+                },
+            ]
+        );
     }
 
     #[test]

@@ -1,9 +1,51 @@
 use super::ResponsesStreamRequest;
+use super::is_previous_response_not_found;
 use super::log_retry;
 use crate::session::tests::make_session_and_context;
+use http::StatusCode;
 use orbiterx_protocol::error::OrbiterXErr;
+use orbiterx_protocol::error::UnexpectedResponseError;
 use std::time::Duration;
 use tracing_test::internal::MockWriter;
+
+fn unexpected_status(status: StatusCode, body: &str) -> OrbiterXErr {
+    OrbiterXErr::UnexpectedStatus(UnexpectedResponseError {
+        status,
+        body: body.to_string(),
+        user_message: None,
+        url: None,
+        cf_ray: None,
+        request_id: None,
+        identity_authorization_error: None,
+        identity_error_code: None,
+    })
+}
+
+#[test]
+fn previous_response_not_found_detection() {
+    let missing_response = unexpected_status(
+        StatusCode::NOT_FOUND,
+        r#"{"type":"error","status":404,"error":{"code":"previous_response_not_found","message":"Response 'resp_1' not found. Use 'client.responses.list()' to list available Responses."}}"#,
+    );
+    assert!(is_previous_response_not_found(&missing_response));
+
+    let missing_model = unexpected_status(
+        StatusCode::NOT_FOUND,
+        r#"{"error":{"message":"Model 'deepseek-v4-flash' not found or disabled"}}"#,
+    );
+    assert!(!is_previous_response_not_found(&missing_model));
+
+    let server_error = unexpected_status(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Response 'resp_1' not found",
+    );
+    assert!(!is_previous_response_not_found(&server_error));
+
+    assert!(!is_previous_response_not_found(&OrbiterXErr::Stream(
+        "stream disconnected before completion".to_string(),
+        None,
+    )));
+}
 
 #[tokio::test]
 async fn sampling_retry_logs_stream_error_context() {

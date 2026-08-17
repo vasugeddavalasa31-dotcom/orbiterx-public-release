@@ -56,6 +56,7 @@ orbiterx-network-proxy = { workspace = true }
 orbiterx-otel = { workspace = true }
 orbiterx-plugin = { workspace = true }
 orbiterx-model-provider = { workspace = true }
+orbiterx-keyring-store = { workspace = true }
 orbiterx-protocol = { workspace = true }
 orbiterx-response-debug-context = { workspace = true }
 orbiterx-prompts = { workspace = true }

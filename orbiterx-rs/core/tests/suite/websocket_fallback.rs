@@ -6,6 +6,7 @@ use core_test_support::responses::ev_response_created;
 use core_test_support::responses::mount_sse_once;
 use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::sse;
+use core_test_support::responses::start_websocket_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::test_orbiterx::TestOrbiterX;
 use core_test_support::test_orbiterx::local_selections;
@@ -18,6 +19,7 @@ use orbiterx_protocol::protocol::EventMsg;
 use orbiterx_protocol::protocol::Op;
 use orbiterx_protocol::user_input::UserInput;
 use pretty_assertions::assert_eq;
+use serde_json::json;
 use tokio::time::Duration;
 use tokio::time::timeout;
 use wiremock::Mock;
@@ -202,6 +204,103 @@ async fn websocket_fallback_hides_first_websocket_retry_stream_error() -> Result
     assert_eq!(stream_error_messages, expected_stream_errors);
     assert_eq!(response_mock.requests().len(), 1);
 
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn websocket_previous_response_not_found_recovers_with_full_request() -> Result<()> {
+    skip_if_no_network!(Ok(()));
+
+    let server = start_websocket_server(vec![
+        // First connection: startup prewarm, then a turn whose chained
+        // `previous_response_id` is rejected as unknown by the upstream.
+        vec![
+            vec![ev_response_created("warm-1"), ev_completed("warm-1")],
+            vec![json!({
+                "type": "error",
+                "status": 404,
+                "error": {
+                    "code": "previous_response_not_found",
+                    "message": "Response 'warm-1' not found. Use 'client.responses.list()' to list available Responses."
+                }
+            })],
+        ],
+        // Second connection: the retry resends the full request and completes.
+        vec![vec![ev_response_created("resp-1"), ev_completed("resp-1")]],
+    ])
+    .await;
+
+    let mut builder = test_orbiterx().with_config({
+        let base_url = format!("{}/v1", server.uri());
+        move |config| {
+            config.model_provider.base_url = Some(base_url);
+            config.model_provider.wire_api = WireApi::Responses;
+            config.model_provider.supports_websockets = true;
+            config.model_provider.stream_max_retries = Some(2);
+            config.model_provider.request_max_retries = Some(0);
+        }
+    });
+    let TestOrbiterX {
+        orbiterx,
+        session_configured,
+        cwd,
+        ..
+    } = builder.build_with_websocket_server(&server).await?;
+    let (sandbox_policy, permission_profile) =
+        turn_permission_fields(PermissionProfile::Disabled, cwd.path());
+
+    orbiterx
+        .submit(Op::UserInput {
+            items: vec![UserInput::Text {
+                text: "hello".into(),
+                text_elements: Vec::new(),
+            }],
+            final_output_json_schema: None,
+            responsesapi_client_metadata: None,
+            additional_context: Default::default(),
+            thread_settings: orbiterx_protocol::protocol::ThreadSettingsOverrides {
+                environments: Some(local_selections(cwd.abs())),
+                approval_policy: Some(AskForApproval::Never),
+                sandbox_policy: Some(sandbox_policy),
+                permission_profile,
+                collaboration_mode: Some(orbiterx_protocol::config_types::CollaborationMode {
+                    mode: orbiterx_protocol::config_types::ModeKind::Default,
+                    settings: orbiterx_protocol::config_types::Settings {
+                        model: session_configured.model.clone(),
+                        reasoning_effort: None,
+                        developer_instructions: None,
+                    },
+                }),
+                ..Default::default()
+            },
+        })
+        .await?;
+
+    // The known previous-response 404 recovers silently: no "Reconnecting..."
+    // stream error is shown and the turn completes.
+    loop {
+        let event = timeout(Duration::from_secs(10), orbiterx.next_event())
+            .await
+            .expect("timeout waiting for event")
+            .expect("event stream ended unexpectedly")
+            .msg;
+        match event {
+            EventMsg::StreamError(e) => panic!("unexpected stream error: {}", e.message),
+            EventMsg::TurnComplete(_) => break,
+            _ => {}
+        }
+    }
+
+    let connections = server.connections();
+    assert_eq!(connections.len(), 2);
+    let first_connection = &connections[0];
+    assert_eq!(first_connection.len(), 2);
+    let retry_connection = &connections[1];
+    assert_eq!(retry_connection.len(), 1);
+    let retry_request = retry_connection[0].body_json();
+    assert_eq!(retry_request.get("previous_response_id"), None);
+
+    server.shutdown().await;
     Ok(())
 }
 

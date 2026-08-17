@@ -76,6 +76,14 @@ struct IdClaims {
     profile: Option<ProfileClaims>,
     #[serde(rename = "https://api.openai.com/auth", default)]
     auth: Option<AuthClaims>,
+    #[serde(default)]
+    properties: Option<PropertiesClaims>,
+}
+
+#[derive(Deserialize)]
+struct PropertiesClaims {
+    #[serde(default)]
+    email: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -138,6 +146,7 @@ pub fn parse_chatgpt_jwt_claims(jwt: &str) -> Result<IdTokenInfo, IdTokenInfoErr
     let claims: IdClaims = decode_jwt_payload(jwt)?;
     let email = claims
         .email
+        .or_else(|| claims.properties.as_ref().and_then(|p| p.email.clone()))
         .or_else(|| claims.profile.and_then(|profile| profile.email));
 
     match claims.auth {

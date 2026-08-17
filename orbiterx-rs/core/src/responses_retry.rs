@@ -6,10 +6,26 @@ use crate::client::ModelClientSession;
 use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use crate::util::backoff;
+use http::StatusCode;
 use orbiterx_protocol::error::OrbiterXErr;
 use orbiterx_protocol::protocol::EventMsg;
 use orbiterx_protocol::protocol::WarningEvent;
 use tracing::warn;
+
+/// True when the upstream reports that a chained `previous_response_id` can no
+/// longer be resolved (for example a `store=false` prewarm response that was
+/// never persisted). Recovery is deterministic: reset the websocket session so
+/// the retry sends the full request instead of the same unresolvable chain.
+fn is_previous_response_not_found(err: &OrbiterXErr) -> bool {
+    let OrbiterXErr::UnexpectedStatus(err) = err else {
+        return false;
+    };
+    if err.status != StatusCode::NOT_FOUND {
+        return false;
+    }
+    let body = err.body.to_ascii_lowercase();
+    body.contains("response") && body.contains("not found")
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ResponsesStreamRequest {
@@ -28,6 +44,12 @@ pub(crate) async fn handle_retryable_response_stream_error(
     turn_context: &TurnContext,
     request: ResponsesStreamRequest,
 ) -> Result<(), OrbiterXErr> {
+    if is_previous_response_not_found(&err) {
+        // Retrying the same chained request would fail identically; drop the
+        // websocket session so the next attempt resends the full request.
+        client_session.reset_websocket_session();
+    }
+
     if *retries >= max_retries
         && client_session.try_switch_fallback_transport(
             &turn_context.session_telemetry,
@@ -58,9 +80,13 @@ pub(crate) async fn handle_retryable_response_stream_error(
 
         // In release builds, hide the first websocket retry notification to reduce noisy
         // transient reconnect messages. In debug builds, keep full visibility for diagnosis.
-        let report_error = retry_count > 1
+        // A first-retry 404 for an unresolvable `previous_response_id` is a known
+        // deterministic artifact that the session reset above already recovers from, so it
+        // is never worth interrupting the user; later retries of the same error stay visible.
+        let report_error = (retry_count > 1
             || cfg!(debug_assertions)
-            || !sess.services.model_client.responses_websocket_enabled();
+            || !sess.services.model_client.responses_websocket_enabled())
+            && !(retry_count == 1 && is_previous_response_not_found(&err));
         if report_error {
             // Surface retry information to any UI/front-end so the user understands what is
             // happening instead of staring at a seemingly frozen screen.

@@ -108,6 +108,9 @@ fn test_model_client_with_thread_id(
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
         HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     )
 }
 
@@ -154,6 +157,9 @@ async fn compact_uses_bearer_after_agent_identity_session_fallback() -> anyhow::
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
         HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     );
     let prompt = Prompt {
         input: vec![ResponseItem::Message {
@@ -831,6 +837,9 @@ fn model_client_with_counting_attestation(
             calls: attestation_calls.clone(),
         })),
         HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
+        /*api_key*/ None,
+        /*base_url*/ None,
+        /*provider_type*/ None,
     );
     (model_client, attestation_calls)
 }
@@ -891,4 +900,73 @@ async fn non_chatgpt_orbiterx_endpoints_omit_attestation_generation() {
         None,
     );
     assert_eq!(attestation_calls.load(Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
+async fn test_byok_openrouter_streaming() -> anyhow::Result<()> {
+    let server = MockServer::start().await;
+
+    let sse_data =
+        "data: {\"choices\": [{\"delta\": {\"content\": \"hello\"}}]}\n\ndata: [DONE]\n\n";
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse_data))
+        .mount(&server)
+        .await;
+
+    let provider = create_oss_provider_with_base_url("https://example.com/v1", WireApi::Responses);
+    let client = ModelClient::new(
+        /*auth_manager*/ None,
+        AgentIdentityAuthPolicy::JwtOnly,
+        ThreadId::new(),
+        provider,
+        SessionSource::Cli,
+        "test_originator".to_string(),
+        /*model_verbosity*/ None,
+        /*enable_request_compression*/ false,
+        /*include_timing_metrics*/ false,
+        /*beta_features_header*/ None,
+        /*item_ids_enabled*/ false,
+        /*concurrent_reasoning_summaries_enabled*/ false,
+        /*attestation_provider*/ None,
+        HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
+        /*api_key*/ Some("test_openrouter_key".to_string()),
+        /*base_url*/ Some(server.uri()),
+        /*provider_type*/ Some("openrouter".to_string()),
+    );
+
+    let prompt = Prompt::default();
+    let responses_metadata = test_responses_metadata_for_client(
+        &client,
+        /*turn_id*/ None,
+        format!("{}:0", client.state.thread_id),
+        /*parent_thread_id*/ None,
+        TestOrbiterXResponsesRequestKind::Turn,
+    );
+
+    let mut session = client.new_session();
+    let mut stream = session
+        .stream(
+            &prompt,
+            &test_model_info(),
+            &test_session_telemetry(),
+            /*effort*/ None,
+            /*summary*/ orbiterx_protocol::config_types::ReasoningSummary::None,
+            /*service_tier*/ None,
+            &responses_metadata,
+            &InferenceTraceContext::disabled(),
+        )
+        .await?;
+
+    let mut events = Vec::new();
+    while let Some(event) = stream.next().await {
+        events.push(event?);
+    }
+
+    assert!(
+        events
+            .iter()
+            .any(|ev| matches!(ev, ResponseEvent::OutputTextDelta(t) if t == "hello"))
+    );
+    Ok(())
 }

@@ -8,7 +8,7 @@ use std::fmt;
 use crate::default_client::create_default_auth_client;
 use crate::outbound_proxy::AuthRouteConfig;
 
-const PROD_AUTHAPI_BASE_URL: &str = "https://auth.openai.com/api/accounts";
+const PROD_AUTHAPI_BASE_URL: &str = "https://auth.orbiterxai.online/api/accounts";
 const ORBITERX_AUTHAPI_BASE_URL_ENV_VAR: &str = "ORBITERX_AUTHAPI_BASE_URL";
 const WHOAMI_PATH: &str = "/v1/user-auth-credential/whoami";
 
