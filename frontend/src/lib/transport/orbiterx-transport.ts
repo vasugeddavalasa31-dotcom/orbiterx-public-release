@@ -14,7 +14,7 @@ import { convIdFromThreadId, folderIdFromPath } from "@/lib/app-server-ids"
 import { beginOrbiterxOAuth } from "@/lib/auth-oauth"
 import { classifyCollabOp, COLLAB_OP_KEY } from "@/lib/collab-tool"
 import { useConversationRuntimeStore } from "@/stores/conversation-runtime-store"
-import { ORBITERX_BASE_INSTRUCTIONS } from "@/lib/orbiterx-base-instructions"
+import { buildBaseInstructions } from "@/lib/orbiterx-base-instructions"
 import { normalizeStatus } from "@/lib/plan-parse"
 
 /**
@@ -3049,8 +3049,14 @@ export class OrbiterXTransport implements Transport {
           // the model emit one exec_command per read/search, which the UI
           // renders as separate Read/Grep cards (like Codex) instead of one
           // opaque chained bash card. `baseInstructions` is a thread/start
-          // override with highest precedence in session/mod.rs.
-          baseInstructions: ORBITERX_BASE_INSTRUCTIONS,
+          // override with highest precedence in session/mod.rs. Built per
+          // selected model + personality so each model gets its own identity
+          // (like Codex's per-model catalog) and the composer's personality
+          // pick actually changes the system prompt.
+          baseInstructions: buildBaseInstructions(
+            this.currentConfigOptions["model"],
+            this.effectivePersonality() ?? "none"
+          ),
         })
 
         // THE FIX: Drill down into the nested response to get the real UUID
@@ -3167,7 +3173,10 @@ export class OrbiterXTransport implements Transport {
               ...(this.effectivePersonality()
                 ? { personality: this.effectivePersonality() }
                 : {}),
-              baseInstructions: ORBITERX_BASE_INSTRUCTIONS,
+              baseInstructions: buildBaseInstructions(
+                this.currentConfigOptions["model"],
+                this.effectivePersonality() ?? "none"
+              ),
             })
             const newThreadId = res?.thread?.id
             if (newThreadId) {

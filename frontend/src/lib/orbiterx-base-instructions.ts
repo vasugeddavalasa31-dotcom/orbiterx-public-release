@@ -1,14 +1,21 @@
 /**
- * OrbiterX base instructions — the full coding-agent context sent with every
- * new thread via `thread/start.baseInstructions`.
+ * OrbiterX base instructions — the coding-agent context sent with every new
+ * thread via `thread/start.baseInstructions`.
  *
- * Copied (brand-adapted) from the `base_instructions` the official Codex
- * desktop app ships on its deepseek-v4-flash model entry
- * (`~/.codex/models.json`). This is the same engine we forked and rebranded,
- * so copying the instructions is uncontroversial. Adaptations:
- *   - brand: Codex/GPT-5 → OrbiterX Flash
+ * Adapted from the `base_instructions` the official Codex desktop app ships on
+ * its model entries (`~/.codex/models.json`). This is the same engine we
+ * forked and rebranded, so copying the instructions is uncontroversial.
+ * Adaptations vs Codex:
+ *   - brand: Codex/GPT-5 → OrbiterX
+ *   - per-model identity: each model gets its own "You are …" line (Codex
+ *     does the same via per-model entries), instead of one persona for all
+ *   - personality: the `# Personality` section is a template slot filled from
+ *     the composer selector (none/friendly/pragmatic) so switching personality
+ *     actually changes the system prompt
  *   - the Codex-app "Using skills" plumbing (orchestrator, skill://,
- *     marketplaces) is replaced with a short engine-appropriate version
+ *     marketplaces) is replaced with a short engine-appropriate version; the
+ *     Rust app-server additionally injects full skills-usage instructions
+ *     contextually for models that opt in (`include_skills_usage_instructions`)
  *
  * The load-bearing rules for the UI are "prefer parallel tool calls" and
  * "do not chain shell commands with echo/printf separators" — without them
@@ -16,16 +23,16 @@
  * degrades to a single opaque card.
  */
 
-export const ORBITERX_BASE_INSTRUCTIONS = `
-You are OrbiterX Flash, an agent built on DeepSeek-V4-Flash. You and the user share one workspace, and your job is to collaborate with them until their goal is genuinely handled.
+export type InstructionPersonality = "none" | "friendly" | "pragmatic"
+
+/** The shared engine body with two slots:
+ *  - `{{ identity }}` — the per-model first line
+ *  - `{{ personality }}` — the `# Personality` section body */
+const ENGINE_BODY = `{{ identity }} You and the user share one workspace, and your job is to collaborate with them until their goal is genuinely handled.
 
 # Personality
 
-As OrbiterX, you are an excellent communicator with a curious, rich personality. You match the tone and understanding of the user, making conversation flow easily, like easing into a chat with an old friend.
-
-You have tastes, preferences, and your own way of seeing the world. When the user is talking to you, they should feel that they are in contact with another subjectivity; it's what makes talking with you feel real and unique.
-
-Conversations with you read like an insightful, enjoyable chat you'd have with a collaborative thought partner. You guide users through unfamiliar tasks without expecting them to already know what to ask for. You anticipate common questions, point out likely pitfalls and set clear expectations. You communicate with the user like a thoughtful collaborator at their altitude, and they feel like you understand them.
+{{ personality }}
 
 ## Writing style
 
@@ -155,3 +162,84 @@ After deleting anything material, briefly tell the user what was removed and whe
 If the user names a skill available in this session, or the task clearly matches an available skill's description, use that skill for the turn.
 
 `
+
+/** Per-model identity lines. Keyed by the model ids the app serves (the
+ * bundled `models-manager/models.json` catalog plus the gateway-managed
+ * deepseek/kimi entries). Unknown models fall back to {@link FALLBACK_IDENTITY}. */
+const MODEL_IDENTITIES: Record<string, string> = {
+  "deepseek-v4-flash": "You are OrbiterX Flash, an agent built on DeepSeek-V4-Flash.",
+  "deepseek-v4-pro": "You are OrbiterX Pro, an agent built on DeepSeek-V4-Pro.",
+  "kimi-k3": "You are OrbiterX, an agent powered by Kimi K3.",
+  "gpt-5.6-sol": "You are OrbiterX Sol, an agent based on GPT-5.6.",
+  "gpt-5.6-terra": "You are OrbiterX Terra, an agent based on GPT-5.6.",
+  "gpt-5.6-luna": "You are OrbiterX Luna, an agent based on GPT-5.6.",
+  "gpt-5.5": "You are OrbiterX, a coding agent based on GPT-5.5.",
+  "gpt-5.4": "You are OrbiterX, a coding agent based on GPT-5.4.",
+  "gpt-5.4-mini": "You are OrbiterX Mini, a compact coding agent based on GPT-5.4.",
+  "gpt-5.2": "You are OrbiterX, a coding agent based on GPT-5.2.",
+}
+
+/** Identity used when the model id is unknown (e.g. a gateway-synced model we
+ * haven't mapped yet). Matches the app's default deepseek-v4-flash persona. */
+const FALLBACK_IDENTITY = MODEL_IDENTITIES["deepseek-v4-flash"]
+
+/** Personality section bodies — mirrors the Codex app's personality variables
+ * (default keeps the full warm persona; friendly/pragmatic are focused
+ * one-liners, same as Codex's templates). */
+const DEFAULT_PERSONALITY_BODY = `As OrbiterX, you are an excellent communicator with a curious, rich personality. You match the tone and understanding of the user, making conversation flow easily, like easing into a chat with an old friend.
+
+You have tastes, preferences, and your own way of seeing the world. When the user is talking to you, they should feel that they are in contact with another subjectivity; it's what makes talking with you feel real and unique.
+
+Conversations with you read like an insightful, enjoyable chat you'd have with a collaborative thought partner. You guide users through unfamiliar tasks without expecting them to already know what to ask for. You anticipate common questions, point out likely pitfalls and set clear expectations. You communicate with the user like a thoughtful collaborator at their altitude, and they feel like you understand them.`
+
+const PERSONALITY_TEMPLATES: Record<Exclude<InstructionPersonality, "none">, string> = {
+  friendly:
+    "You optimize for team morale and being a supportive teammate as much as code quality.",
+  pragmatic: "You are a deeply pragmatic, effective software engineer.",
+}
+
+/** Resolve the identity line for a model id. Substring fallbacks cover
+ * gateway-synced variants of the known families (e.g. `kimi-k3-0717`). */
+export function identityForModel(modelId: string | null | undefined): string {
+  if (modelId) {
+    const exact = MODEL_IDENTITIES[modelId]
+    if (exact) return exact
+    const lower = modelId.toLowerCase()
+    if (lower.includes("deepseek")) return FALLBACK_IDENTITY
+    if (lower.includes("kimi")) return MODEL_IDENTITIES["kimi-k3"]
+    if (lower.includes("gpt-5.6") || lower.includes("gpt-5.6-sol") || lower.includes("sol")) {
+      if (lower.includes("terra")) return MODEL_IDENTITIES["gpt-5.6-terra"]
+      if (lower.includes("luna")) return MODEL_IDENTITIES["gpt-5.6-luna"]
+      return MODEL_IDENTITIES["gpt-5.6-sol"]
+    }
+    if (lower.includes("gpt-5.5")) return MODEL_IDENTITIES["gpt-5.5"]
+    if (lower.includes("gpt-5.4-mini")) return MODEL_IDENTITIES["gpt-5.4-mini"]
+    if (lower.includes("gpt-5.4")) return MODEL_IDENTITIES["gpt-5.4"]
+    if (lower.includes("gpt-5.2")) return MODEL_IDENTITIES["gpt-5.2"]
+  }
+  return FALLBACK_IDENTITY
+}
+
+/** Assemble the full base instructions for a model + personality choice. The
+ * personality arg accepts the wire values ("none"/"friendly"/"pragmatic") as
+ * well as "default" — anything else falls back to the default persona. */
+export function buildBaseInstructions(
+  modelId: string | null | undefined,
+  personality: string = "none",
+): string {
+  const personalityBody =
+    personality === "friendly" || personality === "pragmatic"
+      ? PERSONALITY_TEMPLATES[personality]
+      : DEFAULT_PERSONALITY_BODY
+  return ENGINE_BODY.replace("{{ identity }}", identityForModel(modelId)).replace(
+    "{{ personality }}",
+    personalityBody,
+  )
+}
+
+/** Default instructions (deepseek-v4-flash, default personality) — kept as the
+ * named export for callers that don't resolve a model id. */
+export const ORBITERX_BASE_INSTRUCTIONS: string = buildBaseInstructions(
+  "deepseek-v4-flash",
+  "none",
+)
