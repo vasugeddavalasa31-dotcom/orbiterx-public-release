@@ -101,13 +101,25 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         shell: pwsh
         run: |
-          $v = $env:VERSION
+          # Write the config override as a real JSON file (inline JSON strings
+          # with escaped quotes get mangled by PowerShell).
+          $cfg = @{
+            version = $env:VERSION
+            bundle = @{ createUpdaterArtifacts = $true }
+          } | ConvertTo-Json -Depth 5
+          $cfgPath = Join-Path $env:RUNNER_TEMP "tauri-build-config.json"
+          $cfg | Set-Content -Path $cfgPath -Encoding UTF8
           if ($env:TAURI_SIGNING_PRIVATE_KEY) {
             Write-Host "Signing key present — creating signed updater artifacts."
-            pnpm tauri build --config "{`"version`":`"$v`",`"bundle`":{`"createUpdaterArtifacts`":true}}"
+            pnpm tauri build --config $cfgPath
           } else {
+            $cfgNoSig = @{
+              version = $env:VERSION
+              bundle = @{ createUpdaterArtifacts = $false }
+            } | ConvertTo-Json -Depth 5
+            $cfgNoSig | Set-Content -Path $cfgPath -Encoding UTF8
             Write-Host "No TAURI_SIGNING_PRIVATE_KEY — building without updater signing (latest.json will not be produced)."
-            pnpm tauri build --config "{`"version`":`"$v`",`"bundle`":{`"createUpdaterArtifacts`":false}}"
+            pnpm tauri build --config $cfgPath
           }
 
       - name: List bundle artifacts
