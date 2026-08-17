@@ -5,8 +5,7 @@ packages:
   - orbiterx-rs/responses-api-proxy/npm
   - sdk/typescript
 
-ignoredBuiltDependencies:
-  - esbuild
+ignoredBuiltDependencies: []
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude: []
@@ -17,5 +16,11 @@ trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 10080
 trustPolicyExclude: []
 allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': true
   electron: true
   electron-winstaller: true
+  esbuild: true
+  msw: false
+  sharp: true
+  unrs-resolver: true
