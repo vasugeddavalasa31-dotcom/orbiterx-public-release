@@ -1,24 +1,32 @@
-# Build the OrbiterX Windows standalone .exe and publish it to THIS repo
-# (orbiterx-public-release).
+# Build the OrbiterX Windows .exe (Tauri app: Next.js frontend + Rust
+# orbiterx-app-server sidecar) and publish it to the public release repo:
+#   vasugeddavalasa31-dotcom/orbiterx-public-release
 #
-# WHY THIS LIVES IN THE PUBLIC REPO: GitHub-hosted Actions minutes are free
-# and unlimited on public repos, but metered on private repos. Putting the
-# build here means it never consumes the private repo's minutes.
+# Mirrors the LOCAL build (build.sh → `pnpm tauri build` in frontend/):
+#   1. `beforeBuildCommand` (`pnpm tauri:prepare-sidecars`) builds the
+#      codeg-mcp + orbiterx-app-server sidecars for the target triple and
+#      stages them into frontend/src-tauri/binaries/
+#   2. `pnpm build` produces the Next.js static export (frontendDist: ../out)
+#   3. `tauri build` compiles the app and bundles the Windows NSIS .exe
+#   4. With TAURI_SIGNING_PRIVATE_KEY set, emits signed updater artifacts
+#      (latest.json + .sig) so installed apps auto-update from this repo.
 #
-# The source lives in the private repo vasugeddavalasa31-dotcom/orbiterxprodcution.
-# This workflow checks it out using a PAT, builds the Rust `orbiterx` CLI +
-# the Electron app (`orbiterx-standalone/`), then publishes the exe,
-# .blockmap, and latest.yml as a release in this repo.
+# Why it lives in the PUBLIC repo: GitHub-hosted Actions minutes are free and
+# unlimited on public repos but metered on private ones. The source lives in
+# the private repo vasugeddavalasa31-dotcom/orbiterxprodcution and is checked
+# out here via a PAT.
 #
-# Trigger: manual (workflow_dispatch) with a version, or a pushed tag `v*.*.*`
-# on THIS repo. Tag name must be the version prefixed with `v`, e.g. `v1.2.39`.
+# Trigger: manual (workflow_dispatch) with a version, or a pushed tag `v*.*.*`.
+# Tag name must be the release version prefixed with `v`, e.g. `v1.2.39`.
 #
-# Required repository secret (on THIS repo):
-#   PRIVATE_SOURCE_TOKEN — a PAT with:
-#     - read access to vasugeddavalasa31-dotcom/orbiterxprodcution (Contents: Read)
-#     - write access to THIS repo (Contents: Read and write)
-#   A classic token with the `repo` scope satisfies both (the existing
-#   PUBLIC_RELEASE_TOKEN value works if it is a classic `repo`-scoped token).
+# Required repository secrets (on THIS repo):
+#   PRIVATE_SOURCE_TOKEN — a PAT with read access to
+#       vasugeddavalasa31-dotcom/orbiterxprodcution (Contents: Read) and write
+#       access to THIS repo (Contents: Read and write).
+#   TAURI_SIGNING_PRIVATE_KEY + TAURI_SIGNING_PRIVATE_KEY_PASSWORD — the Tauri
+#       updater signing key. REQUIRED for auto-update: without it the build
+#       skips latest.json/.sig (installers still publish, but installed apps
+#       cannot verify an update). Generate with `tauri signer generate`.
 
 name: Build Windows EXE & Publish
 
@@ -26,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, e.g. 1.2.39 (leave blank to read orbiterx-standalone/package.json)"
+        description: "Release version, e.g. 1.2.39 (leave blank to read tauri.conf.json)"
         required: false
         type: string
   push:
@@ -42,7 +50,7 @@ env:
 jobs:
   build-win:
     runs-on: windows-latest
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - name: Checkout private source
         uses: actions/checkout@v4
@@ -67,7 +75,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: orbiterx-rs
+          workspaces: frontend/src-tauri, orbiterx-rs
 
       - name: Resolve version
         id: version
@@ -75,37 +83,40 @@ jobs:
         run: |
           $v = "${{ inputs.version }}"
           if ([string]::IsNullOrWhiteSpace($v)) {
-            $pkg = Get-Content -Raw orbiterx-standalone/package.json | ConvertFrom-Json
-            $v = [string]$pkg.version
+            $conf = Get-Content -Raw frontend/src-tauri/tauri.conf.json | ConvertFrom-Json
+            $v = [string]$conf.version
           }
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "Resolved version: $v"
 
-      - name: Build orbiterx CLI (release)
-        working-directory: orbiterx-rs
-        run: cargo build -p orbiterx-cli --release
-
-      - name: Stage orbiterx.exe for Electron packaging
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force orbiterx-standalone/resources | Out-Null
-          Copy-Item orbiterx-rs/target/release/orbiterx.exe orbiterx-standalone/resources/orbiterx.exe -Force
-          Get-Item orbiterx-standalone/resources/orbiterx.exe | Select-Object Name, Length
-
-      - name: Install workspace dependencies
+      - name: Install frontend dependencies
+        working-directory: frontend
         run: pnpm install --frozen-lockfile || pnpm install
 
-      - name: Build renderer + package Windows EXE
-        working-directory: orbiterx-standalone
+      - name: Build Tauri Windows app (sidecars + Next.js export + NSIS exe)
+        working-directory: frontend
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          pnpm exec electron-builder --win nsis --publish never `
-            --config.extraMetadata.version="$env:VERSION"
-
-      - name: List packaged artifacts
         shell: pwsh
-        run: Get-ChildItem orbiterx-standalone/dist | Select-Object Name, Length
+        run: |
+          $v = $env:VERSION
+          if ($env:TAURI_SIGNING_PRIVATE_KEY) {
+            Write-Host "Signing key present — creating signed updater artifacts."
+            pnpm tauri build --config "{`"version`":`"$v`",`"bundle`":{`"createUpdaterArtifacts`":true}}"
+          } else {
+            Write-Host "No TAURI_SIGNING_PRIVATE_KEY — building without updater signing (latest.json will not be produced)."
+            pnpm tauri build --config "{`"version`":`"$v`",`"bundle`":{`"createUpdaterArtifacts`":false}}"
+          }
+
+      - name: List bundle artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem frontend/src-tauri/target/release/bundle/nsis | Select-Object Name, Length
+          Write-Host "--- updater artifacts (if any) ---"
+          Get-ChildItem frontend/src-tauri/target/release/bundle/nsis -Filter "*.sig" | Select-Object Name, Length
+          Get-ChildItem frontend/src-tauri/target/release/bundle/nsis -Filter "latest.json" | Select-Object Name, Length
 
       - name: Publish assets to this repo's release
         shell: pwsh
@@ -113,15 +124,13 @@ jobs:
           GH_TOKEN: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
         run: |
           $v = "${{ steps.version.outputs.version }}"
-          $dist = "orbiterx-standalone/dist"
-          $assets = @(
-            "$dist/orbiterx-electron-win-x64.exe",
-            "$dist/orbiterx-electron-win-x64.exe.blockmap",
-            "$dist/latest.yml"
-          )
-          foreach ($a in $assets) {
-            if (-not (Test-Path $a)) { throw "Missing artifact: $a" }
-          }
+          $nsis = "frontend/src-tauri/target/release/bundle/nsis"
+          $assets = @()
+          Get-ChildItem $nsis -Filter "*.exe" | ForEach-Object { $assets += $_.FullName }
+          Get-ChildItem $nsis -Filter "*.sig" | ForEach-Object { $assets += $_.FullName }
+          if (Test-Path "$nsis/latest.json") { $assets += "$nsis/latest.json" }
+          if ($assets.Count -eq 0) { throw "No installer found in $nsis" }
+          foreach ($a in $assets) { Write-Host "Asset: $a" }
           if (gh release view "v$v" -R ${{ github.repository }} --json tagName --jq .tagName 2>$null) {
             Write-Host "Release v$v already exists — uploading assets (clobber)."
             gh release upload "v$v" $assets -R ${{ github.repository }} --clobber
