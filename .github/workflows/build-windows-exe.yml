@@ -78,9 +78,11 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces:
-            - frontend/src-tauri
-            - orbiterx-rs
+          # `workspaces` is a string: newline-separated "path -> target"
+          # entries (YAML literal block). A list or comma string is invalid.
+          workspaces: |
+            frontend/src-tauri -> target
+            orbiterx-rs -> target
 
       - name: Resolve pnpm store path
         id: pnpm-store
