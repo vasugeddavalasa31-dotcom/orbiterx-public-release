@@ -70,12 +70,27 @@ jobs:
           version: 11.9.0
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        # Pin the exact toolchain from orbiterx-rs/rust-toolchain.toml (1.95.0).
+        # @stable would drift as new stable releases land and change the
+        # rust-cache key, forcing a full rebuild every time.
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: frontend/src-tauri, orbiterx-rs
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: pwsh
+        run: echo "STORE_PATH=$(pnpm store path)" >> $env:GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
+          key: pnpm-store-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'frontend/package.json') }}
+          restore-keys: pnpm-store-
 
       - name: Resolve version
         id: version
