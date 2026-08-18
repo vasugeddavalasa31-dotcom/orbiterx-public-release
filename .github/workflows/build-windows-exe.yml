@@ -78,7 +78,9 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: frontend/src-tauri, orbiterx-rs
+          workspaces:
+            - frontend/src-tauri
+            - orbiterx-rs
 
       - name: Resolve pnpm store path
         id: pnpm-store
