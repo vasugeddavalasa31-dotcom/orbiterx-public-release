@@ -86,6 +86,10 @@ jobs:
           workspaces: |
             frontend/src-tauri -> target
             orbiterx-rs -> target
+          # Save the cache even if a later step (e.g. publish) fails, so an
+          # expensive compile is never wasted again. Without this, a failed
+          # job drops its cache and the next run rebuilds from scratch.
+          save-if: ${{ !cancelled() }}
 
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -98,6 +102,7 @@ jobs:
           path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
           key: pnpm-store-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'frontend/package.json') }}
           restore-keys: pnpm-store-
+          save-always: true
 
       - name: Resolve version
         id: version
