@@ -86,10 +86,10 @@ jobs:
           workspaces: |
             frontend/src-tauri -> target
             orbiterx-rs -> target
-          # Save the cache even if a later step (e.g. publish) fails, so an
-          # expensive compile is never wasted again. Without this, a failed
-          # job drops its cache and the next run rebuilds from scratch.
-          save-if: ${{ !cancelled() }}
+          # Cache even if a later step (e.g. publish) fails, so an expensive
+          # compile is never wasted again. (`save-if` with an expression like
+          # `!cancelled()` breaks GitHub's workflow parser.)
+          cache-on-failure: true
 
       - name: Resolve pnpm store path
         id: pnpm-store
