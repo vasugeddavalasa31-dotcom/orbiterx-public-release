@@ -166,6 +166,43 @@ jobs:
           Get-ChildItem frontend/src-tauri/target/release/bundle -Recurse -Filter "*.sig" | Select-Object FullName, Length
           Get-ChildItem frontend/src-tauri/target/release/bundle -Recurse -Filter "latest.json" | Select-Object FullName, Length
 
+      - name: Generate latest.json updater manifest
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_REPO: vasugeddavalasa31-dotcom/orbiterx-public-release
+        run: |
+          # Tauri v2 does NOT write latest.json during `tauri build` — it only
+          # emits the .exe + .sig. latest.json is the manifest the desktop
+          # updater fetches; we must generate it from the signed artifacts.
+          $v = $env:VERSION
+          $bundle = "frontend/src-tauri/target/release/bundle"
+          $exe = Get-ChildItem "$bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No installer exe found under bundle/nsis" }
+          $sigPath = "$($exe.FullName).sig"
+          if (-not (Test-Path $sigPath)) { throw "Missing signature: $sigPath" }
+          # Tauri's `signature` field is base64 of the .sig file content
+          # (mirrors how the pubkey is base64 of the .pub text).
+          $sigB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sigPath))
+          $exeName = Split-Path $exe.FullName -Leaf
+          $url = "https://github.com/$env:RELEASE_REPO/releases/latest/download/$exeName"
+          $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $manifest = @{
+            version = $v
+            notes   = ""
+            pub_date = $pubDate
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $sigB64
+                url       = $url
+              }
+            }
+          } | ConvertTo-Json -Depth 6
+          $manifestPath = "$bundle/latest.json"
+          $manifest | Set-Content -Path $manifestPath -Encoding UTF8
+          Write-Host "Generated $manifestPath"
+          Write-Host $manifest
+
       - name: Publish assets to this repo's release
         shell: pwsh
         env:
@@ -179,12 +216,9 @@ jobs:
           $assets = @()
           Get-ChildItem "$bundle/nsis" -Filter "*.exe" | ForEach-Object { $assets += $_.FullName }
           Get-ChildItem $bundle -Recurse -Filter "*.sig" | ForEach-Object { $assets += $_.FullName }
-          # `latest.json` is the auto-update manifest the desktop app fetches.
-          # Tauri v2 writes it at the bundle root (not inside nsis/), so search
-          # the whole bundle tree.
-          Get-ChildItem $bundle -Recurse -Filter "latest.json" | ForEach-Object { $assets += $_.FullName }
+          $assets += "$bundle/latest.json"
           $assets = $assets | Select-Object -Unique
-          if ($assets.Count -eq 0) { throw "No installer found under $bundle" }
+          if (-not (Test-Path "$bundle/latest.json")) { throw "latest.json was not generated" }
           foreach ($a in $assets) { Write-Host "Asset: $a" }
           if (gh release view "v$v" -R ${{ github.repository }} --json tagName --jq .tagName 2>$null) {
             Write-Host "Release v$v already exists — uploading assets (clobber)."
