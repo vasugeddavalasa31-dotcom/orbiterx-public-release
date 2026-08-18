@@ -103,9 +103,15 @@ jobs:
         run: |
           # Write the config override as a real JSON file (inline JSON strings
           # with escaped quotes get mangled by PowerShell).
+          # Build only the NSIS .exe installer — `bundle.targets: "all"` in
+          # tauri.conf.json also triggers the WiX MSI bundle, which is neither
+          # wanted nor reliably working on CI runners.
           $cfg = @{
             version = $env:VERSION
-            bundle = @{ createUpdaterArtifacts = $true }
+            bundle = @{
+              createUpdaterArtifacts = $true
+              targets = @("nsis")
+            }
           } | ConvertTo-Json -Depth 5
           $cfgPath = Join-Path $env:RUNNER_TEMP "tauri-build-config.json"
           $cfg | Set-Content -Path $cfgPath -Encoding UTF8
@@ -115,7 +121,10 @@ jobs:
           } else {
             $cfgNoSig = @{
               version = $env:VERSION
-              bundle = @{ createUpdaterArtifacts = $false }
+              bundle = @{
+                createUpdaterArtifacts = $false
+                targets = @("nsis")
+              }
             } | ConvertTo-Json -Depth 5
             $cfgNoSig | Set-Content -Path $cfgPath -Encoding UTF8
             Write-Host "No TAURI_SIGNING_PRIVATE_KEY — building without updater signing (latest.json will not be produced)."
