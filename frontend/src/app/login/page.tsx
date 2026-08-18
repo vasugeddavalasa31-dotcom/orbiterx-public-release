@@ -145,9 +145,10 @@ export default function LoginPage() {
     }
   }, [ssoStatus, deviceCode, router, t])
 
-  // Desktop users skip login entirely — unless they just signed out, so the
-  // login page stays visible after an explicit logout in the desktop app.
-  if (isDesktop() && !isExplicitLogout()) {
+  // Desktop users who are already signed in skip straight to the workspace.
+  // A fresh install (no persisted credential) must NOT skip — they see the
+  // login form. An explicit logout also keeps the login page visible.
+  if (isDesktop() && hasOrbiterxAuth() && !isExplicitLogout()) {
     router.replace("/workspace")
     return null
   }

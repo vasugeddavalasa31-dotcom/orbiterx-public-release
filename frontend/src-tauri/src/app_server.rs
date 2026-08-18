@@ -8,7 +8,7 @@
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
-use std::process::Child;
+use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -49,6 +49,29 @@ fn server_already_running() -> bool {
     TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
 }
 
+/// Spawn the bundled app-server without showing a Windows console window.
+/// The sidecar is a console-subsystem binary, so without this flag a
+/// `CreateProcess`-spawned child pops a terminal alongside the app.
+#[cfg(windows)]
+fn spawn_no_console(path: &std::path::Path) -> std::io::Result<Child> {
+    use std::os::windows::process::CommandExt;
+    // CREATE_NO_WINDOW (0x08000000): run without allocating a console window.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    Command::new(path)
+        .arg("--listen")
+        .arg(APP_SERVER_LISTEN)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+}
+
+#[cfg(not(windows))]
+fn spawn_no_console(path: &std::path::Path) -> std::io::Result<Child> {
+    Command::new(path)
+        .arg("--listen")
+        .arg(APP_SERVER_LISTEN)
+        .spawn()
+}
+
 /// Spawn the bundled app-server (idempotent). Called from Tauri setup before
 /// the UI connects, so the workspace loads without a "Reconnecting…" loop.
 pub fn spawn_app_server(app: &AppHandle) {
@@ -72,11 +95,7 @@ pub fn spawn_app_server(app: &AppHandle) {
         return;
     };
 
-    match std::process::Command::new(&path)
-        .arg("--listen")
-        .arg(APP_SERVER_LISTEN)
-        .spawn()
-    {
+    match spawn_no_console(&path) {
         Ok(child) => {
             tracing::info!(
                 "[app-server] started {} on {}",

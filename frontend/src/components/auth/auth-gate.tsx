@@ -32,7 +32,12 @@ export function AuthGate() {
     const check = () => {
       if (!pathname || isPublicRoute()) return
       if (isDesktop()) {
-        if (isExplicitLogout()) {
+        // Desktop still requires a persisted credential: a fresh install has
+        // none, so every app route bounces to /login until the user signs in.
+        // (Signing in writes the gateway provider + token, which also enables
+        // the real gateway model catalog.) An explicit logout also forces the
+        // login page to stay visible.
+        if (!hasOrbiterxAuth() || isExplicitLogout()) {
           router.replace("/login")
         }
         return
