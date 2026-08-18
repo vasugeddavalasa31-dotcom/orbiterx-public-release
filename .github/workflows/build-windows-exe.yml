@@ -162,9 +162,9 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem frontend/src-tauri/target/release/bundle/nsis | Select-Object Name, Length
-          Write-Host "--- updater artifacts (if any) ---"
-          Get-ChildItem frontend/src-tauri/target/release/bundle/nsis -Filter "*.sig" | Select-Object Name, Length
-          Get-ChildItem frontend/src-tauri/target/release/bundle/nsis -Filter "latest.json" | Select-Object Name, Length
+          Write-Host "--- updater artifacts (any location) ---"
+          Get-ChildItem frontend/src-tauri/target/release/bundle -Recurse -Filter "*.sig" | Select-Object FullName, Length
+          Get-ChildItem frontend/src-tauri/target/release/bundle -Recurse -Filter "latest.json" | Select-Object FullName, Length
 
       - name: Publish assets to this repo's release
         shell: pwsh
@@ -175,12 +175,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = "${{ steps.version.outputs.version }}"
-          $nsis = "frontend/src-tauri/target/release/bundle/nsis"
+          $bundle = "frontend/src-tauri/target/release/bundle"
           $assets = @()
-          Get-ChildItem $nsis -Filter "*.exe" | ForEach-Object { $assets += $_.FullName }
-          Get-ChildItem $nsis -Filter "*.sig" | ForEach-Object { $assets += $_.FullName }
-          if (Test-Path "$nsis/latest.json") { $assets += "$nsis/latest.json" }
-          if ($assets.Count -eq 0) { throw "No installer found in $nsis" }
+          Get-ChildItem "$bundle/nsis" -Filter "*.exe" | ForEach-Object { $assets += $_.FullName }
+          Get-ChildItem $bundle -Recurse -Filter "*.sig" | ForEach-Object { $assets += $_.FullName }
+          # `latest.json` is the auto-update manifest the desktop app fetches.
+          # Tauri v2 writes it at the bundle root (not inside nsis/), so search
+          # the whole bundle tree.
+          Get-ChildItem $bundle -Recurse -Filter "latest.json" | ForEach-Object { $assets += $_.FullName }
+          $assets = $assets | Select-Object -Unique
+          if ($assets.Count -eq 0) { throw "No installer found under $bundle" }
           foreach ($a in $assets) { Write-Host "Asset: $a" }
           if (gh release view "v$v" -R ${{ github.repository }} --json tagName --jq .tagName 2>$null) {
             Write-Host "Release v$v already exists — uploading assets (clobber)."
