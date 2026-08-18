@@ -39,7 +39,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklESTFPRFZFUVVNNVJVUTJNVVUxT1RJS1VsZFRVelZYU0hSNVpIRkdTbFJhVm01VUwwaEZibXBVSzFkU09VbHpiVXA0VWs0dlJtNHJTVlpLTnpoSlVFbG9UVmR2V2pjNFpETUs=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1ODVEQUM5RUQ2MUU1OTIKUldTUzVXSHR5ZHFGSlRaVm5UL0hFbmpUK1dSOUlzbUp4Uk4vRm4rSVZKNzhJUEloTVdvWjc4ZDMK",
       "endpoints": [
         "https://github.com/vasugeddavalasa31-dotcom/orbiterx-public-release/releases/latest/download/latest.json"
       ],
