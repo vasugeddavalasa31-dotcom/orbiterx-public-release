@@ -42,7 +42,10 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read
+  # `GITHUB_TOKEN` creates the release in THIS repo (orbiterx-public-release).
+  # The private-source checkout uses PRIVATE_SOURCE_TOKEN explicitly, so it is
+  # unaffected by this scope.
+  contents: write
 
 env:
   SOURCE_REPO: vasugeddavalasa31-dotcom/orbiterxprodcution
@@ -161,7 +164,10 @@ jobs:
       - name: Publish assets to this repo's release
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
+          # The built-in token has write access to THIS repo (contents: write
+          # above). A fine-grained PAT scoped to the private source does not
+          # necessarily have release-write here, which caused an HTTP 403.
+          GH_TOKEN: ${{ github.token }}
         run: |
           $v = "${{ steps.version.outputs.version }}"
           $nsis = "frontend/src-tauri/target/release/bundle/nsis"
