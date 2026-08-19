@@ -106,7 +106,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         shell: powershell
-        run: pnpm install --no-frozen-lockfile
+        run: |
+          pnpm config set fetch-retries 5
+          pnpm config set fetch-retry-maxtimeout 120000
+          pnpm install --no-frozen-lockfile
 
       - name: Build Tauri Windows app (sidecars + Next.js export + NSIS exe)
         working-directory: frontend
