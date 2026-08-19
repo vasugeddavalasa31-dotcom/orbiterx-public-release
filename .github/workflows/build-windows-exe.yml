@@ -185,7 +185,7 @@ jobs:
           # (mirrors how the pubkey is base64 of the .pub text).
           $sigB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sigPath))
           $exeName = Split-Path $exe.FullName -Leaf
-          $url = "https://github.com/$env:RELEASE_REPO/releases/latest/download/$exeName"
+          $url = "https://github.com/$env:RELEASE_REPO/releases/download/v$v/$exeName"
           $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $manifest = @{
             version = $v
