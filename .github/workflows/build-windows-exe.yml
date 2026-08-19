@@ -52,7 +52,7 @@ env:
 
 jobs:
   build-win:
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows]
     timeout-minutes: 180
     steps:
       - name: Checkout private source
