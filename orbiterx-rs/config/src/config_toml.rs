@@ -957,7 +957,12 @@ fn deserialize_model_providers<'de, D>(
 where
     D: serde::Deserializer<'de>,
 {
-    let model_providers = HashMap::<String, ModelProviderInfo>::deserialize(deserializer)?;
+    let mut model_providers = HashMap::<String, ModelProviderInfo>::deserialize(deserializer)?;
+    for (key, provider) in model_providers.iter_mut() {
+        if provider.name.trim().is_empty() {
+            provider.name = key.clone();
+        }
+    }
     validate_model_providers(&model_providers).map_err(serde::de::Error::custom)?;
     Ok(model_providers)
 }
