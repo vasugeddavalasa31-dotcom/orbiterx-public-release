@@ -72,24 +72,11 @@ jobs:
         with:
           version: 11.9.0
 
-      - name: Setup Rust
-        # Pin the exact toolchain from orbiterx-rs/rust-toolchain.toml (1.95.0).
-        # @stable would drift as new stable releases land and change the
-        # rust-cache key, forcing a full rebuild every time.
-        uses: dtolnay/rust-toolchain@1.95.0
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          # `workspaces` is a string: newline-separated "path -> target"
-          # entries (YAML literal block). A list or comma string is invalid.
-          workspaces: |
-            frontend/src-tauri -> target
-            orbiterx-rs -> target
-          # Cache even if a later step (e.g. publish) fails, so an expensive
-          # compile is never wasted again. (`save-if` with an expression like
-          # `!cancelled()` breaks GitHub's workflow parser.)
-          cache-on-failure: true
+      - name: Verify Rust toolchain
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
 
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -118,7 +105,8 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile || pnpm install
+        shell: pwsh
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build Tauri Windows app (sidecars + Next.js export + NSIS exe)
         working-directory: frontend
