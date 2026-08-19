@@ -102,15 +102,21 @@ function main() {
     { stdio: "inherit", cwd: SRC_TAURI }
   )
 
-  const built = join(
-    SRC_TAURI,
-    "target",
-    target,
-    "release",
-    `${BIN_NAME}${ext}`
-  )
-  if (!existsSync(built)) {
-    die(`expected ${built} after cargo build, but it does not exist`)
+  const targetDir =
+    process.env.CARGO_TARGET_DIR || join(REPO_ROOT, "target")
+
+  const candidateBuiltPaths = [
+    join(targetDir, target, "release", `${BIN_NAME}${ext}`),
+    join(targetDir, "release", `${BIN_NAME}${ext}`),
+    join(SRC_TAURI, "target", target, "release", `${BIN_NAME}${ext}`),
+    join(SRC_TAURI, "target", "release", `${BIN_NAME}${ext}`),
+  ]
+
+  const built = candidateBuiltPaths.find((p) => existsSync(p))
+  if (!built) {
+    die(
+      `expected ${BIN_NAME}${ext} after cargo build, but could not find in:\n${candidateBuiltPaths.join("\n")}`
+    )
   }
 
   mkdirSync(BINARIES_DIR, { recursive: true })
@@ -134,17 +140,18 @@ function main() {
     ["build", "--release", "--bin", APP_SERVER_BIN, "--target", target],
     { stdio: "inherit", cwd: appServerDir }
   )
-  const appServerBuilt = join(
-    REPO_ROOT,
-    "orbiterx-rs",
-    "target",
-    target,
-    "release",
-    `${APP_SERVER_BIN}${ext}`
-  )
-  if (!existsSync(appServerBuilt)) {
+
+  const candidateAppServerPaths = [
+    join(targetDir, target, "release", `${APP_SERVER_BIN}${ext}`),
+    join(targetDir, "release", `${APP_SERVER_BIN}${ext}`),
+    join(REPO_ROOT, "orbiterx-rs", "target", target, "release", `${APP_SERVER_BIN}${ext}`),
+    join(REPO_ROOT, "orbiterx-rs", "target", "release", `${APP_SERVER_BIN}${ext}`),
+  ]
+
+  const appServerBuilt = candidateAppServerPaths.find((p) => existsSync(p))
+  if (!appServerBuilt) {
     die(
-      `expected ${appServerBuilt} after cargo build, but it does not exist`
+      `expected ${APP_SERVER_BIN}${ext} after cargo build, but could not find in:\n${candidateAppServerPaths.join("\n")}`
     )
   }
   const appServerDest = join(
