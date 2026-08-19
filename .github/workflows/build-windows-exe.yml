@@ -73,14 +73,14 @@ jobs:
           version: 11.9.0
 
       - name: Verify Rust toolchain
-        shell: pwsh
+        shell: powershell
         run: |
           rustc --version
           cargo --version
 
       - name: Resolve pnpm store path
         id: pnpm-store
-        shell: pwsh
+        shell: powershell
         run: echo "STORE_PATH=$(pnpm store path)" >> $env:GITHUB_OUTPUT
 
       - name: Cache pnpm store
@@ -93,7 +93,7 @@ jobs:
 
       - name: Resolve version
         id: version
-        shell: pwsh
+        shell: powershell
         run: |
           $v = "${{ inputs.version }}"
           if ([string]::IsNullOrWhiteSpace($v)) {
@@ -105,7 +105,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        shell: pwsh
+        shell: powershell
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Tauri Windows app (sidecars + Next.js export + NSIS exe)
@@ -114,7 +114,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VERSION: ${{ steps.version.outputs.version }}
-        shell: pwsh
+        shell: powershell
         run: |
           # Write the config override as a real JSON file (inline JSON strings
           # with escaped quotes get mangled by PowerShell).
@@ -147,7 +147,7 @@ jobs:
           }
 
       - name: List bundle artifacts
-        shell: pwsh
+        shell: powershell
         run: |
           Get-ChildItem frontend/src-tauri/target/release/bundle/nsis | Select-Object Name, Length
           Write-Host "--- updater artifacts (any location) ---"
@@ -155,7 +155,7 @@ jobs:
           Get-ChildItem frontend/src-tauri/target/release/bundle -Recurse -Filter "latest.json" | Select-Object FullName, Length
 
       - name: Generate latest.json updater manifest
-        shell: pwsh
+        shell: powershell
         env:
           VERSION: ${{ steps.version.outputs.version }}
           RELEASE_REPO: vasugeddavalasa31-dotcom/orbiterx-public-release
@@ -192,7 +192,7 @@ jobs:
           Write-Host $manifest
 
       - name: Publish assets to this repo's release
-        shell: pwsh
+        shell: powershell
         env:
           # The built-in token has write access to THIS repo (contents: write
           # above). A fine-grained PAT scoped to the private source does not
