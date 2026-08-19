@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { AppTitleBar } from "@/components/layout/app-title-bar"
 import { BrandMark } from "@/components/landing/brand-mark"
 import { OrbitVisual } from "@/components/landing/orbit-visual"
 import { decodeJwtProperties } from "@/lib/auth-oauth"
@@ -216,11 +217,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* In-window title bar: the Tauri main window has no native frame on
+          Windows/Linux, so this renders the min/max/close controls + a drag
+          region. macOS keeps the native traffic lights overlaid, so this
+          provides the top spacing for them on the login screen too. */}
+      <AppTitleBar />
+
       {/* Decorative orbit, tucked into the corner */}
       <OrbitVisual className="absolute -right-48 -top-48 size-[34rem] opacity-15" />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center gap-12 px-6 py-12 lg:flex-row lg:items-center lg:gap-20">
+      <div className="relative flex min-h-0 flex-1 overflow-y-auto">
+        <div className="relative mx-auto flex w-full max-w-6xl flex-col justify-center gap-12 px-6 py-12 lg:flex-row lg:items-center lg:gap-20">
         {/* ── Brand panel (desktop) ─────────────────────────────────────── */}
         <div className="hidden flex-1 lg:block">
           <BrandMark />
@@ -429,6 +437,7 @@ export default function LoginPage() {
               {t("backHome")}
             </Link>
           </div>
+        </div>
         </div>
       </div>
     </div>
