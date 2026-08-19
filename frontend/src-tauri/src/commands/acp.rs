@@ -10660,25 +10660,44 @@ pub(crate) async fn codex_request_device_code_core() -> Result<CodexDeviceCodeRe
 
     async fn oauth_callback(
         axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
-        axum::extract::State(slot): axum::extract::State<Arc<OauthCallbackSlot>>,
+        axum::extract::State(listener_slot): axum::extract::State<Arc<OauthCallbackSlot>>,
     ) -> impl axum::response::IntoResponse {
-        // The state we started the sign-in with must round-trip, or the code
-        // may have been injected by someone other than the browser we opened.
-        if params.get("state").map(String::as_str) != Some(slot.state.as_str()) {
-            return (
-                axum::http::StatusCode::BAD_REQUEST,
-                axum::response::Html(
-                    "<html><body><h2>Sign-in failed</h2><p>State mismatch. Please try signing in again.</p></body></html>",
-                ),
-            );
-        }
+        // Resolve the active login slot by the incoming `state` across the
+        // registry, not just this listener's captured slot. A browser tab kept
+        // open from a previous attempt/session (common on Windows) completes
+        // with the OLD state; hard-failing on that mismatch dead-ends login.
+        // The PKCE code verifier is the real session binding — matching by
+        // state just routes the callback to the attempt it belongs to.
+        let incoming_state = params.get("state").map(String::as_str);
+        let (matched_by_state, slot) = {
+            let guard = oauth_callbacks().lock().unwrap();
+            let matched = guard
+                .values()
+                .find(|s| incoming_state == Some(s.state.as_str()))
+                .cloned();
+            let matched_by_state = matched.is_some();
+            // Fall back to this listener's own slot when the state is absent or
+            // was mangled by the auth server/browser round-trip: the PKCE
+            // verifier still binds the code to this session. A stale code then
+            // simply fails the exchange (handled below) without touching the
+            // current attempt.
+            let slot = matched.unwrap_or(listener_slot);
+            (matched_by_state, slot)
+        };
+
         if let Some(error_code) = params.get("error") {
             let description = params
                 .get("error_description")
                 .map(|d| format!(" ({d})"))
                 .unwrap_or_default();
-            *slot.error.lock().await = Some(format!("OAuth error: {error_code}{description}"));
-            slot.shutdown.notify_one();
+            if matched_by_state {
+                *slot.error.lock().await = Some(format!("OAuth error: {error_code}{description}"));
+                slot.shutdown.notify_one();
+            } else {
+                tracing::warn!(
+                    "[oauth] error callback with unknown state, ignoring: {incoming_state:?}"
+                );
+            }
             return (
                 axum::http::StatusCode::OK,
                 axum::response::Html(
@@ -10699,14 +10718,29 @@ pub(crate) async fn codex_request_device_code_core() -> Result<CodexDeviceCodeRe
         // race the 60s code TTL or a second poll). The frontend poll reads the
         // stored result.
         let result = exchange_authorization_code(&slot, &code).await;
-        *slot.result.lock().await = Some(result);
-        slot.shutdown.notify_one();
-        (
-            axum::http::StatusCode::OK,
-            axum::response::Html(
-                "<html><body><h2>Sign-in successful</h2><p>You can close this tab and return to OrbiterX.</p></body></html>",
-            ),
-        )
+        if matched_by_state || result.status == "success" {
+            *slot.result.lock().await = Some(result);
+            slot.shutdown.notify_one();
+            (
+                axum::http::StatusCode::OK,
+                axum::response::Html(
+                    "<html><body><h2>Sign-in successful</h2><p>You can close this tab and return to OrbiterX.</p></body></html>",
+                ),
+            )
+        } else {
+            // Unknown state and the exchange failed: this was a stale callback
+            // (e.g. a tab from a previous session). Leave the current attempt's
+            // slot untouched so its own poll keeps working.
+            tracing::warn!(
+                "[oauth] callback with unknown state failed exchange, ignoring: {incoming_state:?}"
+            );
+            (
+                axum::http::StatusCode::BAD_REQUEST,
+                axum::response::Html(
+                    "<html><body><h2>Sign-in failed</h2><p>This sign-in window is no longer active (it may be from an earlier login attempt). Please close this tab and try signing in again.</p></body></html>",
+                ),
+            )
+        }
     }
 
     let app = axum::Router::new()
