@@ -201,7 +201,7 @@ jobs:
           Write-Host $manifest
 
       - name: Publish assets to this repo's release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "v${{ steps.version.outputs.version }}"
           name: "${{ steps.version.outputs.version }}"
