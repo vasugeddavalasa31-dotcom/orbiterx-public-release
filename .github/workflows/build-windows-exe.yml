@@ -52,7 +52,7 @@ env:
 
 jobs:
   build-win:
-    runs-on: [self-hosted, Windows]
+    runs-on: windows-latest
     timeout-minutes: 180
     steps:
       - name: Checkout private source
@@ -72,11 +72,16 @@ jobs:
         with:
           version: 11.9.0
 
-      - name: Verify Rust toolchain
-        shell: powershell
-        run: |
-          rustc --version
-          cargo --version
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            frontend/src-tauri -> target
+            orbiterx-rs -> target
+          cache-on-failure: true
 
       - name: Resolve pnpm store path
         id: pnpm-store
