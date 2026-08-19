@@ -202,25 +202,25 @@ jobs:
       - name: Publish assets to this repo's release
         shell: powershell
         env:
-          # The built-in token has write access to THIS repo (contents: write
-          # above). A fine-grained PAT scoped to the private source does not
-          # necessarily have release-write here, which caused an HTTP 403.
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = "${{ steps.version.outputs.version }}"
           $bundle = "frontend/src-tauri/target/release/bundle"
-          $assets = @()
-          Get-ChildItem "$bundle/nsis" -Filter "*.exe" | ForEach-Object { $assets += $_.FullName }
-          Get-ChildItem $bundle -Recurse -Filter "*.sig" | ForEach-Object { $assets += $_.FullName }
-          $assets += "$bundle/latest.json"
-          $assets = $assets | Select-Object -Unique
-          if (-not (Test-Path "$bundle/latest.json")) { throw "latest.json was not generated" }
-          foreach ($a in $assets) { Write-Host "Asset: $a" }
-          if (gh release view "v$v" -R ${{ github.repository }} --json tagName --jq .tagName 2>$null) {
+          $exe = (Get-ChildItem "$bundle/nsis" -Filter "*.exe" | Select-Object -First 1).FullName
+          $sig = (Get-ChildItem "$bundle" -Recurse -Filter "*.sig" | Select-Object -First 1).FullName
+          $json = (Get-Item "$bundle/latest.json").FullName
+
+          Write-Host "Found assets to publish:"
+          Write-Host "  EXE: $exe"
+          Write-Host "  SIG: $sig"
+          Write-Host "  JSON: $json"
+
+          gh release view "v$v"
+          if ($LASTEXITCODE -eq 0) {
             Write-Host "Release v$v already exists — uploading assets (clobber)."
-            gh release upload "v$v" $assets -R ${{ github.repository }} --clobber
+            gh release upload "v$v" $exe $sig $json --clobber
           } else {
             Write-Host "Creating release v$v."
-            gh release create "v$v" $assets -R ${{ github.repository }} --title "$v" --notes "OrbiterX Windows build v$v"
+            gh release create "v$v" $exe $sig $json --title "$v" --notes "OrbiterX Windows build v$v"
           }
           Write-Host "Published: https://github.com/${{ github.repository }}/releases/tag/v$v"
