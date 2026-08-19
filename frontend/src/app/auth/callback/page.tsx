@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, CheckCircle2, Loader2, XCircle } from "lucide-react"
@@ -23,8 +23,12 @@ export default function AuthCallbackPage() {
     "loading"
   )
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const hasExchanged = useRef(false)
 
   useEffect(() => {
+    if (hasExchanged.current) return
+    hasExchanged.current = true
+
     const code = searchParams.get("code")
     const state = searchParams.get("state")
     if (!code) {
