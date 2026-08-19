@@ -28,13 +28,33 @@ pub struct AppServerHandle(pub Mutex<Option<Child>>);
 fn sidecar_path() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
-    let name = if cfg!(windows) {
-        "orbiterx-app-server.exe"
+    let names: &[&str] = if cfg!(windows) {
+        &[
+            "orbiterx-app-server.exe",
+            "orbiterx-app-server-x86_64-pc-windows-msvc.exe",
+            "binaries/orbiterx-app-server.exe",
+            "binaries/orbiterx-app-server-x86_64-pc-windows-msvc.exe",
+            "resources/orbiterx-app-server.exe",
+            "resources/orbiterx-app-server-x86_64-pc-windows-msvc.exe",
+        ]
     } else {
-        "orbiterx-app-server"
+        &[
+            "orbiterx-app-server",
+            "orbiterx-app-server-aarch64-apple-darwin",
+            "orbiterx-app-server-x86_64-apple-darwin",
+            "orbiterx-app-server-x86_64-unknown-linux-gnu",
+            "binaries/orbiterx-app-server",
+            "resources/orbiterx-app-server",
+        ]
     };
-    let candidate = dir.join(name);
-    candidate.exists().then_some(candidate)
+
+    for name in names {
+        let candidate = dir.join(name);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// True when something already listens on the app-server port — e.g. a dev

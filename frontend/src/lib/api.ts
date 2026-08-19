@@ -3553,14 +3553,7 @@ export async function setOrbiterxGatewayApiKey(apiKey: string): Promise<void> {
           base_url: "https://railway-gateway-production.up.railway.app/v1",
           wire_api: "responses",
           supports_websockets: false,
-          auth: {
-            command: "echo",
-            args: [effectiveKey],
-            timeout_ms: 5000,
-            // Short refresh so a login key is picked up quickly after sign-in.
-            refresh_interval_ms: 10000,
-            cwd: "/",
-          },
+          experimental_bearer_token: effectiveKey,
         },
         mergeStrategy: "replace",
       },
