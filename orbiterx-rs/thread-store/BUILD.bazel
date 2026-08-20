@@ -1,6 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "thread-store",
-    crate_name = "orbiterx_thread_store",
-)

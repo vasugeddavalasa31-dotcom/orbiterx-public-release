@@ -1,6 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "process-hardening",
-    crate_name = "orbiterx_process_hardening",
-)

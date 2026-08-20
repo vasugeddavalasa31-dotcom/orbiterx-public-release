@@ -1,9 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "write",
-    compile_data = glob([
-        "templates/**",
-    ]),
-    crate_name = "orbiterx_memories_write",
-)

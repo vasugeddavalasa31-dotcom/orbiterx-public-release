@@ -1,4 +1,0 @@
-interface:
-  display_name: "OrbiterX Issue Digest"
-  short_description: "Summarize OrbiterX issues by labels or all areas"
-  default_prompt: "Use $orbiterx-issue-digest to run the OrbiterX issue digest for labels tui and exec over the previous 24 hours."

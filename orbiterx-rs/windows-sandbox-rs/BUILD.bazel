@@ -1,9 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "windows-sandbox-rs",
-    build_script_data = [
-        "orbiterx-windows-sandbox-setup.manifest",
-    ],
-    crate_name = "orbiterx_windows_sandbox",
-)

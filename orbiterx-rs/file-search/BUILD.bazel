@@ -1,6 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "file-search",
-    crate_name = "orbiterx_file_search",
-)

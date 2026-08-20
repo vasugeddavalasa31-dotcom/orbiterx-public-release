@@ -1,6 +1,0 @@
-load("//:defs.bzl", "orbiterx_rust_crate")
-
-orbiterx_rust_crate(
-    name = "context-fragments",
-    crate_name = "orbiterx_context_fragments",
-)
