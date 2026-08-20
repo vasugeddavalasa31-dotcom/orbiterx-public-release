@@ -180,7 +180,7 @@ jobs:
           if (-not $exe) { throw "No installer exe found under bundle/nsis" }
           $sigPath = "$($exe.FullName).sig"
           if (-not (Test-Path $sigPath)) { throw "Missing signature: $sigPath" }
-          $sigB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sigPath))
+          $sigB64 = (Get-Content $sigPath -Raw).Trim()
           $exeName = Split-Path $exe.FullName -Leaf
           $url = "https://github.com/$env:RELEASE_REPO/releases/download/v$v/$exeName"
           $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
