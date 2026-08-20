@@ -59,9 +59,89 @@ env:
   RUSTFLAGS: "-C link-arg=-fuse-ld=lld -C link-arg=/DEBUG:NONE"
 
 jobs:
-  build-win:
+  build-sidecars:
+    name: Build ${{ matrix.sidecar.name }}
     runs-on: windows-latest
-    timeout-minutes: 180
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        sidecar:
+          - name: "orbiterx-app-server"
+            crate_path: "orbiterx-rs/app-server"
+            bin_name: "orbiterx-app-server"
+            dest_name: "orbiterx-app-server-x86_64-pc-windows-msvc.exe"
+            cargo_flags: ""
+          - name: "codeg-mcp"
+            crate_path: "frontend/src-tauri"
+            bin_name: "codeg-mcp"
+            dest_name: "codeg-mcp-x86_64-pc-windows-msvc.exe"
+            cargo_flags: "--no-default-features"
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          token: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "windows-sidecar-${{ matrix.sidecar.name }}"
+          cache-on-failure: true
+
+      - name: Compile sidecar binary
+        shell: powershell
+        working-directory: ${{ matrix.sidecar.crate_path }}
+        run: |
+          $flags = "${{ matrix.sidecar.cargo_flags }}"
+          if ($flags) {
+            cargo build --release --bin ${{ matrix.sidecar.bin_name }} --target x86_64-pc-windows-msvc $flags.Split(' ')
+          } else {
+            cargo build --release --bin ${{ matrix.sidecar.bin_name }} --target x86_64-pc-windows-msvc
+          }
+
+      - name: Stage sidecar artifact
+        shell: powershell
+        run: |
+          $binName = "${{ matrix.sidecar.bin_name }}.exe"
+          $destName = "${{ matrix.sidecar.dest_name }}"
+          $candidates = @(
+            "target/x86_64-pc-windows-msvc/release/$binName",
+            "target/release/$binName",
+            "${{ matrix.sidecar.crate_path }}/target/x86_64-pc-windows-msvc/release/$binName",
+            "${{ matrix.sidecar.crate_path }}/target/release/$binName"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) {
+              $found = $c
+              break
+            }
+          }
+          if (-not $found) { throw "Could not find built binary for ${{ matrix.sidecar.bin_name }}" }
+          New-Item -ItemType Directory -Force -Path "artifacts"
+          Copy-Item -Path $found -Destination "artifacts/$destName" -Force
+          Write-Host "Staged artifact: artifacts/$destName"
+
+      - name: Upload sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.sidecar.name }}
+          path: artifacts/${{ matrix.sidecar.dest_name }}
+          retention-days: 1
+
+  package-and-publish:
+    name: Package Windows EXE & Publish
+    needs: build-sidecars
+    runs-on: windows-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout private source
         uses: actions/checkout@v4
@@ -82,25 +162,31 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: x86_64-pc-windows-msvc
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "windows-target"
+          shared-key: "windows-tauri-main"
           cache-on-failure: true
 
-      - name: Resolve pnpm store path
-        id: pnpm-store
-        shell: powershell
-        run: echo "STORE_PATH=$(pnpm store path)" >> $env:GITHUB_OUTPUT
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
+      - name: Download orbiterx-app-server sidecar
+        uses: actions/download-artifact@v4
         with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: pnpm-store-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'frontend/package.json') }}
-          restore-keys: pnpm-store-
-          save-always: true
+          name: orbiterx-app-server
+          path: frontend/src-tauri/binaries
+
+      - name: Download codeg-mcp sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: codeg-mcp
+          path: frontend/src-tauri/binaries
+
+      - name: Verify pre-staged sidecars
+        shell: powershell
+        run: |
+          Get-ChildItem -Path frontend/src-tauri/binaries
 
       - name: Resolve version
         id: version
@@ -119,7 +205,7 @@ jobs:
         shell: powershell
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build Tauri Windows app (sidecars + Next.js export + NSIS exe)
+      - name: Build Tauri Windows app (Next.js export + NSIS exe)
         working-directory: frontend
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -127,11 +213,6 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         shell: powershell
         run: |
-          # Write the config override as a real JSON file (inline JSON strings
-          # with escaped quotes get mangled by PowerShell).
-          # Build only the NSIS .exe installer — `bundle.targets: "all"` in
-          # tauri.conf.json also triggers the WiX MSI bundle, which is neither
-          # wanted nor reliably working on CI runners.
           $cfg = @{
             version = $env:VERSION
             bundle = @{
@@ -153,17 +234,9 @@ jobs:
               }
             } | ConvertTo-Json -Depth 5
             $cfgNoSig | Set-Content -Path $cfgPath -Encoding UTF8
-            Write-Host "No TAURI_SIGNING_PRIVATE_KEY — building without updater signing (latest.json will not be produced)."
+            Write-Host "No TAURI_SIGNING_PRIVATE_KEY — building without updater signing."
             pnpm tauri build --config $cfgPath
           }
-
-      - name: List bundle artifacts
-        shell: powershell
-        run: |
-          Get-ChildItem -Path target/release/bundle/nsis, frontend/src-tauri/target/release/bundle/nsis -ErrorAction SilentlyContinue | Select-Object Name, Length
-          Write-Host "--- updater artifacts (any location) ---"
-          Get-ChildItem -Path target/release/bundle, frontend/src-tauri/target/release/bundle -Recurse -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object FullName, Length
-          Get-ChildItem -Path target/release/bundle, frontend/src-tauri/target/release/bundle -Recurse -Filter "latest.json" -ErrorAction SilentlyContinue | Select-Object FullName, Length
 
       - name: Generate latest.json updater manifest
         shell: powershell
@@ -198,7 +271,7 @@ jobs:
           $manifestPath = "$bundle/latest.json"
           $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
           [System.IO.File]::WriteAllText($manifestPath, $manifest, $utf8NoBom)
-          Write-Host "Generated $manifestPath"
+          Write-Host "Generated $manifestPath (UTF-8 without BOM)"
           Write-Host $manifest
 
       - name: Publish assets to this repo's release
@@ -206,7 +279,7 @@ jobs:
         with:
           tag_name: "v${{ steps.version.outputs.version }}"
           name: "${{ steps.version.outputs.version }}"
-          notes: "OrbiterX Windows build v${{ steps.version.outputs.version }}"
+          body: "OrbiterX Windows build v${{ steps.version.outputs.version }}"
           files: |
             target/release/bundle/nsis/*.exe
             target/release/bundle/*.sig
