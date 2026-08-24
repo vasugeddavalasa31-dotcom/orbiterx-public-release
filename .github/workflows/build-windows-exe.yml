@@ -72,10 +72,10 @@ jobs:
             bin_name: "orbiterx-app-server"
             dest_name: "orbiterx-app-server-x86_64-pc-windows-msvc.exe"
             cargo_flags: ""
-          - name: "codeg-mcp"
+          - name: "orbiterx-mcp"
             crate_path: "frontend/src-tauri"
-            bin_name: "codeg-mcp"
-            dest_name: "codeg-mcp-x86_64-pc-windows-msvc.exe"
+            bin_name: "orbiterx-mcp"
+            dest_name: "orbiterx-mcp-x86_64-pc-windows-msvc.exe"
             cargo_flags: "--no-default-features"
     steps:
       - name: Checkout private source
@@ -177,11 +177,16 @@ jobs:
           name: orbiterx-app-server
           path: frontend/src-tauri/binaries
 
-      - name: Download codeg-mcp sidecar
+      - name: Download orbiterx-mcp sidecar
         uses: actions/download-artifact@v4
         with:
-          name: codeg-mcp
+          name: orbiterx-mcp
           path: frontend/src-tauri/binaries
+
+      - name: Stage alias for codeg-mcp
+        shell: powershell
+        run: |
+          Copy-Item "frontend/src-tauri/binaries/orbiterx-mcp-x86_64-pc-windows-msvc.exe" "frontend/src-tauri/binaries/codeg-mcp-x86_64-pc-windows-msvc.exe" -Force
 
       - name: Verify pre-staged sidecars
         shell: powershell
