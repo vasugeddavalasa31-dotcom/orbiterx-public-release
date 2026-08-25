@@ -1,58 +1,67 @@
 # OrbiterX
 
-> **OrbiterX** is a powerful multi-agent coding IDE and CLI designed to supercharge your software development workflow. Originally forked from OpenAI's Codex CLI, OrbiterX brings agentic coding directly to your terminal and local computer.
+<div align="center">
 
-## Built with ❤️ in India
-**Built on Codex CLI (Apache-2.0) with ❤️ in India**
+# 🚀 The Next-Generation Multi-Agent AI Coding Platform
 
----
+**OrbiterX is a fast, powerful, multi-agent coding platform designed to supercharge your software engineering workflow with autonomous agents, native IDE & desktop integration, and deep codebase intelligence.**
 
-## What is OrbiterX?
+[![Release](https://img.shields.io/github/v/release/vasugeddavalasa31-dotcom/orbiterx-public-release?style=flat-square&color=indigo)](https://github.com/vasugeddavalasa31-dotcom/orbiterx-public-release/releases)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg?style=flat-square)](#download--installation)
 
-OrbiterX is a local-first, multi-agent coding assistant that works directly within your repository. It coordinates multiple specialized agent sub-processes (e.g., Codebase Researcher, Database Debugger, and Executor agents) to handle complex refactors, run tests, diagnose errors, and carry out large-scale implementation tasks on your local workspace.
-
-## Features
-
-- **Multi-Agent Orchestration**: Out-of-the-box support for spawning concurrent specialized subagents to divide and conquer complex developer tasks.
-- **Local Sandbox Execution**: Secure process isolation using macOS Seatbelt (`sandbox-exec`), Linux Bubblewrap, and Windows Job Objects.
-- **Deep Codebase Awareness**: Ingests your repository layout, indexing files, code symbols, and workspace dependencies incrementally.
-- **Rich Interactive UI (TUI)**: A gorgeous Terminal User Interface powered by `ratatui` with terminal logs, file trees, composer editors, and image rendering.
-- **IDE Extensions**: Seamlessly integrates with VS Code, Cursor, Windsurf, and other major code editors.
-- **Tool & MCP Integration**: Extensible model interaction via the Model Context Protocol (MCP) and custom tool calls.
+</div>
 
 ---
 
-## Installation
+## 🌟 What is OrbiterX?
 
-### Mac or Linux
-To install OrbiterX CLI on macOS or Linux, run:
-```shell
+OrbiterX is a local-first, multi-agent developer environment that connects directly to your codebase. It coordinates multiple specialized AI agent sub-processes (such as Architecture Planners, Codebase Researchers, Database Specialists, and Test Runners) to divide and conquer complex refactoring, feature implementation, automated testing, and error diagnosis.
+
+---
+
+## ✨ Key Features
+
+- 🤖 **Autonomous Multi-Agent Orchestration**: Spawn and orchestrate concurrent specialized subagents that collaborate in real-time to solve complex multi-file tasks.
+- ⚡ **Ultra-Fast Local Sidecars**: Powered by high-performance Rust backend engine (`orbiterx-app-server`) and companion stdio services (`orbiterx-mcp`) for zero-lag streaming and instant responses.
+- 🛡️ **Secure Local Sandboxing**: Execute shell commands, tests, and builds with strict safety boundaries and granular permission controls.
+- 🧠 **Deep Codebase Awareness**: Incremental indexing of repository layouts, AST symbol graphs, and dependencies for precise, context-aware code generation.
+- 🔌 **Model Context Protocol (MCP)**: Native support for external MCP tools, browser automation, custom servers, and API integrations.
+- 📱 **Remote Control & Live Monitoring**: Monitor active reasoning traces, view token telemetry, and manage development sessions seamlessly.
+
+---
+
+## 📥 Download & Installation
+
+### 🪟 Windows Desktop (Installer & Auto-Updater)
+Download the latest Windows setup installer from the [Releases Page](https://github.com/vasugeddavalasa31-dotcom/orbiterx-public-release/releases/latest):
+* **`OrbiterX_x64-setup.exe`** — Includes built-in background auto-updater support.
+
+### 🍎 macOS & 🐧 Linux (CLI)
+Install the OrbiterX developer CLI via curl:
+```bash
 curl -fsSL https://raw.githubusercontent.com/vasugeddavalasa31-dotcom/rustorbiterx/main/scripts/install/install.sh | sh
 ```
 
-### Windows
-To install OrbiterX CLI on Windows, run the following in PowerShell:
+### 🪟 Windows PowerShell (CLI)
+Install the OrbiterX developer CLI via PowerShell:
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/vasugeddavalasa31-dotcom/rustorbiterx/main/scripts/install/install.ps1 | iex"
 ```
 
-### From Source
-Alternatively, you can build OrbiterX directly from source:
-```shell
-# Clone the repository
-git clone https://github.com/vasugeddavalasa31-dotcom/rustorbiterx.git
-cd rustorbiterx/orbiterx-rs
+---
 
-# Build the release binary
-cargo build --release
+## 🚀 Getting Started
+
+Launch OrbiterX inside any repository:
+```bash
+orbiterx
 ```
 
-Once installed, simply run the `orbiterx` command to launch the CLI.
+Or open the **OrbiterX Desktop** application to start chatting with intelligent agent pairs, exploring workspaces, and generating software at warp speed.
 
 ---
 
-## Attribution
+## 📄 License
 
-OrbiterX is a fork of OpenAI's Codex CLI (`openai/codex`). We are deeply grateful to the original creators and contributors of the Codex CLI codebase.
-
-This project is licensed under the Apache-2.0 License. All original copyright notices, attributions, and license conditions have been preserved in accordance with the Apache-2.0 license. See [ATTRIBUTION.md](./ATTRIBUTION.md) and the [LICENSE](./LICENSE) file for more information.
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
