@@ -83,7 +83,8 @@ jobs:
         with:
           repository: ${{ env.SOURCE_REPO }}
           token: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
-          fetch-depth: 0
+          submodules: false
+          fetch-depth: 1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.95.0
@@ -93,7 +94,9 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "windows-sidecar-${{ matrix.sidecar.name }}"
+          prefix-key: "v2-msvc"
+          shared-key: "sidecar-${{ matrix.sidecar.name }}"
+          workspaces: "${{ matrix.sidecar.crate_path }} -> target"
           cache-on-failure: true
 
       - name: Compile sidecar binary
@@ -148,7 +151,8 @@ jobs:
         with:
           repository: ${{ env.SOURCE_REPO }}
           token: ${{ secrets.PRIVATE_SOURCE_TOKEN }}
-          fetch-depth: 0
+          submodules: false
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -168,7 +172,9 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "windows-tauri-main"
+          prefix-key: "v2-msvc"
+          shared-key: "tauri-main"
+          workspaces: "frontend/src-tauri -> target"
           cache-on-failure: true
 
       - name: Download orbiterx-app-server sidecar
