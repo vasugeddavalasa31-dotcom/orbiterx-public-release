@@ -68,12 +68,16 @@ jobs:
       matrix:
         sidecar:
           - name: "orbiterx-app-server"
+            workspace_path: "orbiterx-rs"
             crate_path: "orbiterx-rs/app-server"
+            target_path: "../target"
             bin_name: "orbiterx-app-server"
             dest_name: "orbiterx-app-server-x86_64-pc-windows-msvc.exe"
             cargo_flags: ""
           - name: "orbiterx-mcp"
+            workspace_path: "frontend/src-tauri"
             crate_path: "frontend/src-tauri"
+            target_path: "../../target"
             bin_name: "orbiterx-mcp"
             dest_name: "orbiterx-mcp-x86_64-pc-windows-msvc.exe"
             cargo_flags: "--no-default-features"
@@ -96,7 +100,7 @@ jobs:
         with:
           prefix-key: "v2-msvc"
           shared-key: "sidecar-${{ matrix.sidecar.name }}"
-          workspaces: "${{ matrix.sidecar.crate_path }} -> target"
+          workspaces: "${{ matrix.sidecar.workspace_path }} -> ${{ matrix.sidecar.target_path }}"
           cache-on-failure: true
 
       - name: Compile sidecar binary
@@ -174,7 +178,7 @@ jobs:
         with:
           prefix-key: "v2-msvc"
           shared-key: "tauri-main"
-          workspaces: "frontend/src-tauri -> target"
+          workspaces: "frontend/src-tauri -> ../../target"
           cache-on-failure: true
 
       - name: Download orbiterx-app-server sidecar
