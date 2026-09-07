@@ -101,6 +101,8 @@ jobs:
           prefix-key: "v2-msvc"
           shared-key: "sidecar-${{ matrix.sidecar.name }}"
           workspaces: "${{ matrix.sidecar.workspace_path }} -> ${{ matrix.sidecar.target_path }}"
+          cache-workspace-crates: true
+          cache-all-crates: true
           cache-on-failure: true
 
       - name: Compile sidecar binary
@@ -179,6 +181,8 @@ jobs:
           prefix-key: "v2-msvc"
           shared-key: "tauri-main"
           workspaces: "frontend/src-tauri -> ../../target"
+          cache-workspace-crates: true
+          cache-all-crates: true
           cache-on-failure: true
 
       - name: Download orbiterx-app-server sidecar
